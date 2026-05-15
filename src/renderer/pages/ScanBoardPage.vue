@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
+import { nextTick, onBeforeUnmount, ref } from "vue";
 import type { CreateBoardInput } from "../../shared/types/board";
 import type { DetectedEspBoard } from "../../shared/types/serial";
 import { scanEspBoards } from "../services/espBoardScanner";
@@ -12,6 +12,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const scanLogs = ref<string[]>([]);
 const logCopied = ref(false);
+const scanLogElement = ref<HTMLElement | null>(null);
 let copyResetTimeout: number | null = null;
 
 async function runScan(): Promise<void> {
@@ -23,6 +24,7 @@ async function runScan(): Promise<void> {
   try {
     detectedBoards.value = await scanEspBoards((_level, message) => {
       scanLogs.value = [...scanLogs.value.slice(-80), message];
+      void scrollScanLogToBottom();
     });
   } catch (caughtError) {
     error.value =
@@ -32,6 +34,16 @@ async function runScan(): Promise<void> {
   } finally {
     loading.value = false;
   }
+}
+
+async function scrollScanLogToBottom(): Promise<void> {
+  await nextTick();
+
+  if (!scanLogElement.value) {
+    return;
+  }
+
+  scanLogElement.value.scrollTop = scanLogElement.value.scrollHeight;
 }
 
 async function addDetectedBoard(board: DetectedEspBoard): Promise<void> {
@@ -285,7 +297,7 @@ onBeforeUnmount(() => {
       </v-card-title>
       <v-divider />
       <v-card-text>
-        <pre class="scan-log">{{ scanLogs.join("\n") }}</pre>
+        <pre ref="scanLogElement" class="scan-log">{{ scanLogs.join("\n") }}</pre>
       </v-card-text>
     </v-card>
   </section>
