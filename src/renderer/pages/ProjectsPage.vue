@@ -72,7 +72,9 @@ const coverImageDataUrl = ref<string | null>(null);
 const coverImageError = ref<string | null>(null);
 const coverImageLoading = ref(false);
 const coverImageViewerOpen = ref(false);
+const coverThumbnailUrls = ref<Record<string, string | null>>({});
 let coverImageLoadToken = 0;
+let coverThumbnailLoadToken = 0;
 
 const loading = computed(() => boardsLoading.value || projectsLoading.value);
 const error = computed(() => projectError.value ?? boardError.value);
@@ -147,6 +149,11 @@ const assignableBoardOptions = computed(() => {
       value: board.id
     }));
 });
+const projectCoverPathKey = computed(() =>
+  projects.value
+    .map((project) => `${project.id}:${project.coverImagePath ?? ""}`)
+    .join("|")
+);
 
 onMounted(() => {
   void refreshProjects();
@@ -175,6 +182,14 @@ watch(
   () => selectedRow.value?.project.coverImagePath ?? null,
   (coverImagePath) => {
     void loadSelectedCoverImage(coverImagePath);
+  },
+  { immediate: true }
+);
+
+watch(
+  projectCoverPathKey,
+  () => {
+    void loadProjectCoverThumbnails(projects.value);
   },
   { immediate: true }
 );
@@ -297,6 +312,33 @@ async function loadSelectedCoverImage(
     if (token === coverImageLoadToken) {
       coverImageLoading.value = false;
     }
+  }
+}
+
+async function loadProjectCoverThumbnails(
+  projectList: Project[]
+): Promise<void> {
+  const token = ++coverThumbnailLoadToken;
+  const nextThumbnails: Record<string, string | null> = {};
+
+  await Promise.all(
+    projectList.map(async (project) => {
+      if (!project.coverImagePath) {
+        nextThumbnails[project.id] = null;
+        return;
+      }
+
+      try {
+        nextThumbnails[project.id] =
+          await window.api.projectImages.readCoverDataUrl(project.coverImagePath);
+      } catch {
+        nextThumbnails[project.id] = null;
+      }
+    })
+  );
+
+  if (token === coverThumbnailLoadToken) {
+    coverThumbnailUrls.value = nextThumbnails;
   }
 }
 
@@ -549,9 +591,27 @@ function getProjectImageError(
               @click="selectProject(row.project)"
             >
               <td>
-                <div class="board-name">{{ row.project.name }}</div>
-                <div class="text-caption muted">
-                  {{ row.project.description || "No notes yet" }}
+                <div class="project-list-identity">
+                  <div class="project-list-cover" aria-hidden="true">
+                    <img
+                      v-if="coverThumbnailUrls[row.project.id]"
+                      class="project-list-cover-image"
+                      :src="coverThumbnailUrls[row.project.id] ?? ''"
+                      alt=""
+                    >
+                    <v-icon
+                      v-else
+                      icon="mdi-image-outline"
+                      size="24"
+                      color="secondary"
+                    />
+                  </div>
+                  <div class="project-list-copy">
+                    <div class="board-name">{{ row.project.name }}</div>
+                    <div class="text-caption muted">
+                      {{ row.project.description || "No notes yet" }}
+                    </div>
+                  </div>
                 </div>
               </td>
               <td>
@@ -913,6 +973,36 @@ function getProjectImageError(
 
 .project-row--selected {
   background: #eef4ed;
+}
+
+.project-list-identity {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.project-list-cover {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid #dcded8;
+  border-radius: 8px;
+  background: #f4f6f1;
+}
+
+.project-list-cover-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-list-copy {
+  min-width: 0;
 }
 
 .project-detail-title {
