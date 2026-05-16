@@ -66,6 +66,7 @@ const editingProject = ref<Project | null>(null);
 const deletingProject = ref<Project | null>(null);
 const saving = ref(false);
 const selectedProjectId = ref<string | null>(null);
+const selectedAssignableBoardId = ref<string | null>(null);
 
 const loading = computed(() => boardsLoading.value || projectsLoading.value);
 const error = computed(() => projectError.value ?? boardError.value);
@@ -127,6 +128,19 @@ const unassignedBoardCount = computed(
 const assignedBoardCount = computed(
   () => boards.value.filter((board) => Boolean(board.projectId)).length
 );
+const assignableBoardOptions = computed(() => {
+  const currentProjectId = selectedRow.value?.project.id;
+  if (!currentProjectId) {
+    return [];
+  }
+
+  return boards.value
+    .filter((board) => board.projectId !== currentProjectId)
+    .map((board) => ({
+      title: formatAssignableBoardLabel(board),
+      value: board.id
+    }));
+});
 
 onMounted(() => {
   void refreshProjects();
@@ -146,6 +160,10 @@ watch(
   },
   { immediate: true }
 );
+
+watch(selectedProjectId, () => {
+  selectedAssignableBoardId.value = null;
+});
 
 function emptyForm(): ProjectForm {
   return {
@@ -216,8 +234,36 @@ async function confirmDelete(): Promise<void> {
   deletingProject.value = null;
 }
 
+async function assignBoardToSelectedProject(): Promise<void> {
+  if (!selectedRow.value || !selectedAssignableBoardId.value) {
+    return;
+  }
+
+  await boardStore.updateBoard(selectedAssignableBoardId.value, {
+    projectId: selectedRow.value.project.id
+  });
+  selectedAssignableBoardId.value = null;
+}
+
+async function removeBoardFromProject(board: Board): Promise<void> {
+  await boardStore.updateBoard(board.id, {
+    projectId: null
+  });
+}
+
 function selectProject(project: Project): void {
   selectedProjectId.value = project.id;
+}
+
+function formatAssignableBoardLabel(board: Board): string {
+  const parts = [
+    board.name,
+    board.macAddress,
+    board.chipModel,
+    board.projectId ? "assigned elsewhere" : null
+  ].filter((value): value is string => Boolean(value));
+
+  return parts.join(" / ");
 }
 
 function formatProjectHealth(row: ProjectRow): string {
@@ -427,6 +473,32 @@ function projectHealthColor(row: ProjectRow): string {
             </div>
           </div>
 
+          <div class="section-title mt-5 mb-2">Assign board</div>
+          <div class="assign-board-row">
+            <v-select
+              v-model="selectedAssignableBoardId"
+              :items="assignableBoardOptions"
+              :disabled="!assignableBoardOptions.length"
+              clearable
+              hide-details
+              label="Board"
+            />
+            <v-btn
+              color="primary"
+              prepend-icon="mdi-link-variant"
+              :disabled="!selectedAssignableBoardId"
+              @click="assignBoardToSelectedProject"
+            >
+              Assign
+            </v-btn>
+          </div>
+          <div
+            v-if="!assignableBoardOptions.length"
+            class="text-caption muted mt-2"
+          >
+            Every board in the vault is already assigned to this project.
+          </div>
+
           <div class="section-title mt-5 mb-2">Assigned boards</div>
           <v-table v-if="selectedRow.assignedBoards.length" class="assigned-board-table">
             <thead>
@@ -464,15 +536,25 @@ function projectHealthColor(row: ProjectRow): string {
                 <td>{{ formatPsramSize(board.psramSizeBytes, board.psramDetected) }}</td>
                 <td>{{ board.physicalLocation || "Not set" }}</td>
                 <td class="text-right">
-                  <v-btn
-                    size="small"
-                    variant="tonal"
-                    color="primary"
-                    prepend-icon="mdi-open-in-new"
-                    @click="emit('open-board', board.id)"
-                  >
-                    Open
-                  </v-btn>
+                  <div class="board-actions">
+                    <v-btn
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                      prepend-icon="mdi-open-in-new"
+                      @click="emit('open-board', board.id)"
+                    >
+                      Open
+                    </v-btn>
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      prepend-icon="mdi-link-variant-off"
+                      @click="removeBoardFromProject(board)"
+                    >
+                      Remove
+                    </v-btn>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -610,6 +692,20 @@ function projectHealthColor(row: ProjectRow): string {
   gap: 16px;
 }
 
+.assign-board-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.board-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .project-fact-value {
   margin-top: 4px;
   font-weight: 700;
@@ -641,7 +737,8 @@ function projectHealthColor(row: ProjectRow): string {
 
 @media (max-width: 760px) {
   .project-toolbar,
-  .project-facts {
+  .project-facts,
+  .assign-board-row {
     grid-template-columns: 1fr;
   }
 
