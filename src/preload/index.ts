@@ -9,6 +9,9 @@ const api: EspBoardVaultApi = {
   serial: {
     getLastSelectionCount: () =>
       ipcRenderer.invoke("serial:get-last-selection-count") as Promise<number>
+  },
+  window: {
+    resetSize: () => ipcRenderer.invoke("window:reset-size") as Promise<void>
   }
 };
 

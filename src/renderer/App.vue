@@ -4,6 +4,7 @@ import BoardsPage from "./pages/BoardsPage.vue";
 import DashboardPage from "./pages/DashboardPage.vue";
 import PlaceholderPage from "./pages/PlaceholderPage.vue";
 import ScanBoardPage from "./pages/ScanBoardPage.vue";
+import SettingsPage from "./pages/SettingsPage.vue";
 
 type ViewKey =
   | "dashboard"
@@ -38,11 +39,11 @@ const viewComponents: Record<ViewKey, Component> = {
   scan: ScanBoardPage,
   projects: PlaceholderPage,
   firmware: PlaceholderPage,
-  settings: PlaceholderPage
+  settings: SettingsPage
 };
 
 const placeholderCopy: Record<
-  Exclude<ViewKey, "dashboard" | "boards" | "scan">,
+  Exclude<ViewKey, "dashboard" | "boards" | "scan" | "settings">,
   { title: string; description: string }
 > = {
   projects: {
@@ -52,10 +53,6 @@ const placeholderCopy: Record<
   firmware: {
     title: "Firmware",
     description: "Firmware history will be added after board CRUD is stable."
-  },
-  settings: {
-    title: "Settings",
-    description: "Local app preferences will live here."
   }
 };
 

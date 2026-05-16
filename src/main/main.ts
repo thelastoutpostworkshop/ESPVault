@@ -1,12 +1,34 @@
-import { app, BrowserWindow, clipboard, ipcMain } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, screen } from "electron";
+import {
+  mkdirSync,
+  readFileSync,
+  writeFileSync
+} from "node:fs";
 import path from "node:path";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const SERIAL_SELECTION_COUNT_CHANNEL = "serial:get-last-selection-count";
 const CLIPBOARD_WRITE_TEXT_CHANNEL = "clipboard:write-text";
+const WINDOW_RESET_SIZE_CHANNEL = "window:reset-size";
+
+interface WindowSize {
+  width: number;
+  height: number;
+}
+
+const DEFAULT_WINDOW_SIZE: WindowSize = {
+  width: 1280,
+  height: 820
+};
+const MIN_WINDOW_SIZE: WindowSize = {
+  width: 980,
+  height: 680
+};
 
 let pendingSelectedSerialPortIds: string[] = [];
 let lastSerialPortSelectionCount = 0;
+let mainWindow: BrowserWindow | null = null;
+let windowSizeSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 interface SelectableSerialPort {
   portId: string;
@@ -27,13 +49,23 @@ ipcMain.handle(CLIPBOARD_WRITE_TEXT_CHANNEL, (_event, text: unknown) => {
 
   clipboard.writeText(text);
 });
+ipcMain.handle(WINDOW_RESET_SIZE_CHANNEL, (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+
+  if (!window) {
+    throw new Error("The application window is not available.");
+  }
+
+  resetWindowSize(window);
+});
 
 function createMainWindow(): BrowserWindow {
+  const windowSize = loadWindowSize();
   const window = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 980,
-    minHeight: 680,
+    width: windowSize.width,
+    height: windowSize.height,
+    minWidth: MIN_WINDOW_SIZE.width,
+    minHeight: MIN_WINDOW_SIZE.height,
     title: "ESP Board Vault",
     backgroundColor: "#f7f8f5",
     webPreferences: {
@@ -45,6 +77,8 @@ function createMainWindow(): BrowserWindow {
     }
   });
 
+  mainWindow = window;
+  persistWindowSizeChanges(window);
   configureWebSerial(window);
 
   if (isDevelopment && process.env.VITE_DEV_SERVER_URL) {
@@ -54,6 +88,112 @@ function createMainWindow(): BrowserWindow {
   }
 
   return window;
+}
+
+function persistWindowSizeChanges(window: BrowserWindow): void {
+  window.on("resize", () => {
+    scheduleWindowSizeSave(window);
+  });
+
+  window.on("close", () => {
+    saveWindowSize(window);
+  });
+
+  window.on("closed", () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+    }
+  });
+}
+
+function scheduleWindowSizeSave(window: BrowserWindow): void {
+  if (windowSizeSaveTimer !== null) {
+    clearTimeout(windowSizeSaveTimer);
+  }
+
+  windowSizeSaveTimer = setTimeout(() => {
+    saveWindowSize(window);
+    windowSizeSaveTimer = null;
+  }, 300);
+}
+
+function resetWindowSize(window: BrowserWindow): void {
+  if (window.isMaximized()) {
+    window.unmaximize();
+  }
+
+  const defaultSize = normalizeWindowSize(DEFAULT_WINDOW_SIZE);
+  window.setSize(defaultSize.width, defaultSize.height);
+  window.center();
+  saveWindowSize(window);
+}
+
+function loadWindowSize(): WindowSize {
+  try {
+    const rawState = readFileSync(getWindowStateFilePath(), "utf8");
+    const parsedState = JSON.parse(rawState) as Partial<WindowSize>;
+    return normalizeWindowSize(parsedState);
+  } catch {
+    return DEFAULT_WINDOW_SIZE;
+  }
+}
+
+function saveWindowSize(window: BrowserWindow): void {
+  if (window.isDestroyed() || window.isMinimized() || window.isFullScreen()) {
+    return;
+  }
+
+  const bounds = normalizeWindowSize(window.getBounds());
+
+  try {
+    ensureVaultDataDirectory();
+    writeFileSync(
+      getWindowStateFilePath(),
+      `${JSON.stringify(bounds, null, 2)}\n`,
+      "utf8"
+    );
+  } catch (caughtError) {
+    console.warn("Window size could not be saved.", caughtError);
+  }
+}
+
+function normalizeWindowSize(size: Partial<WindowSize>): WindowSize {
+  const workArea = screen.getPrimaryDisplay().workAreaSize;
+  const width = normalizeWindowDimension(
+    size.width,
+    MIN_WINDOW_SIZE.width,
+    Math.max(MIN_WINDOW_SIZE.width, workArea.width),
+    DEFAULT_WINDOW_SIZE.width
+  );
+  const height = normalizeWindowDimension(
+    size.height,
+    MIN_WINDOW_SIZE.height,
+    Math.max(MIN_WINDOW_SIZE.height, workArea.height),
+    DEFAULT_WINDOW_SIZE.height
+  );
+
+  return { width, height };
+}
+
+function normalizeWindowDimension(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  fallback: number
+): number {
+  const dimension =
+    typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.min(Math.max(Math.round(dimension), minimum), maximum);
+}
+
+function getWindowStateFilePath(): string {
+  return path.join(ensureVaultDataDirectory(), "window-state.json");
+}
+
+function ensureVaultDataDirectory(): string {
+  const directory = path.join(app.getPath("userData"), "esp-board-vault");
+  mkdirSync(directory, { recursive: true });
+  return directory;
 }
 
 function configureWebSerial(window: BrowserWindow): void {

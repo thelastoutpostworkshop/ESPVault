@@ -5,4 +5,7 @@ export interface EspBoardVaultApi {
   serial: {
     getLastSelectionCount(): Promise<number>;
   };
+  window: {
+    resetSize(): Promise<void>;
+  };
 }
