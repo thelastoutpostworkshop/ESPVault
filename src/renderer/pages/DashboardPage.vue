@@ -2,6 +2,7 @@
 import { onMounted } from "vue";
 import { storeToRefs } from "pinia";
 import { useBoardStore } from "../stores/boardStore";
+import { useProjectStore } from "../stores/projectStore";
 import {
   BOARD_STATUS_COLORS,
   BOARD_STATUS_LABELS,
@@ -9,15 +10,21 @@ import {
 } from "../utils/boardDisplay";
 
 const boardStore = useBoardStore();
+const projectStore = useProjectStore();
 const { dashboardStats, error, loading } = storeToRefs(boardStore);
+const { projects, loading: projectsLoading } = storeToRefs(projectStore);
 const emit = defineEmits<{
   "open-boards": [];
   "scan-boards": [];
 }>();
 
 onMounted(() => {
-  void boardStore.refresh();
+  void refreshDashboard();
 });
+
+async function refreshDashboard(): Promise<void> {
+  await Promise.all([boardStore.refresh(), projectStore.loadProjects()]);
+}
 </script>
 
 <template>
@@ -40,8 +47,8 @@ onMounted(() => {
         <v-btn
           variant="outlined"
           prepend-icon="mdi-refresh"
-          :loading="loading"
-          @click="boardStore.refresh"
+          :loading="loading || projectsLoading"
+          @click="refreshDashboard"
         >
           Refresh
         </v-btn>
@@ -53,7 +60,7 @@ onMounted(() => {
     </v-alert>
 
     <v-row>
-      <v-col cols="12" sm="6" lg="3">
+      <v-col cols="12" sm="6" lg>
         <v-card class="metric-card" flat>
           <v-card-text>
             <div class="metric-label">Total boards</div>
@@ -61,7 +68,15 @@ onMounted(() => {
           </v-card-text>
         </v-card>
       </v-col>
-      <v-col cols="12" sm="6" lg="3">
+      <v-col cols="12" sm="6" lg>
+        <v-card class="metric-card" flat>
+          <v-card-text>
+            <div class="metric-label">Projects</div>
+            <div class="metric-value">{{ projects.length }}</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" lg>
         <v-card class="metric-card" flat>
           <v-card-text>
             <div class="metric-label">Available</div>
@@ -69,7 +84,7 @@ onMounted(() => {
           </v-card-text>
         </v-card>
       </v-col>
-      <v-col cols="12" sm="6" lg="3">
+      <v-col cols="12" sm="6" lg>
         <v-card class="metric-card" flat>
           <v-card-text>
             <div class="metric-label">In use</div>
@@ -77,7 +92,7 @@ onMounted(() => {
           </v-card-text>
         </v-card>
       </v-col>
-      <v-col cols="12" sm="6" lg="3">
+      <v-col cols="12" sm="6" lg>
         <v-card class="metric-card" flat>
           <v-card-text>
             <div class="metric-label">Broken</div>
