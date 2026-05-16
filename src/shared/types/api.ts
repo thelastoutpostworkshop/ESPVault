@@ -6,6 +6,9 @@ export interface EspBoardVaultApi {
   clipboard: {
     writeText(text: string): Promise<void>;
   };
+  database: {
+    getLocation(): Promise<DatabaseLocation>;
+  };
   serial: {
     getLastSelectionCount(): Promise<number>;
   };
@@ -21,4 +24,10 @@ export interface BackupSaveResult {
 
 export interface BackupOpenResult extends BackupSaveResult {
   content?: string;
+}
+
+export interface DatabaseLocation {
+  databaseName: string;
+  indexedDbPath: string;
+  userDataPath: string;
 }

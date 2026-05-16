@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
+import type { DatabaseLocation } from "../../shared/types/api";
 import type {
   VaultBackup,
   VaultBackupSummary
@@ -18,8 +19,10 @@ const resettingWindowSize = ref(false);
 const exportingBackup = ref(false);
 const openingBackup = ref(false);
 const importingBackup = ref(false);
+const copyingDatabaseLocation = ref(false);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
+const databaseLocation = ref<DatabaseLocation | null>(null);
 const pendingImport = ref<{
   backup: VaultBackup;
   summary: VaultBackupSummary;
@@ -132,6 +135,43 @@ function buildBackupFileName(): string {
 function totalRecords(summary: VaultBackupSummary): number {
   return Object.values(summary.counts).reduce((total, count) => total + count, 0);
 }
+
+async function loadDatabaseLocation(): Promise<void> {
+  try {
+    databaseLocation.value = await window.api.database.getLocation();
+  } catch (caughtError) {
+    error.value =
+      caughtError instanceof Error
+        ? caughtError.message
+        : "The database location could not be loaded.";
+  }
+}
+
+async function copyDatabaseLocation(): Promise<void> {
+  if (!databaseLocation.value) {
+    return;
+  }
+
+  copyingDatabaseLocation.value = true;
+  error.value = null;
+  notice.value = null;
+
+  try {
+    await window.api.clipboard.writeText(databaseLocation.value.indexedDbPath);
+    notice.value = "Database location copied.";
+  } catch (caughtError) {
+    error.value =
+      caughtError instanceof Error
+        ? caughtError.message
+        : "The database location could not be copied.";
+  } finally {
+    copyingDatabaseLocation.value = false;
+  }
+}
+
+onMounted(() => {
+  void loadDatabaseLocation();
+});
 </script>
 
 <template>
@@ -177,12 +217,33 @@ function totalRecords(summary: VaultBackupSummary): number {
 
     <v-card class="mt-4" flat border>
       <v-card-title class="text-subtitle-1 font-weight-bold">
-        Backup
+        Database
       </v-card-title>
       <v-divider />
       <v-card-text class="settings-row">
+        <div class="settings-detail">
+          <div class="font-weight-medium">Current location</div>
+          <div class="text-body-2 muted mt-1">
+            {{ databaseLocation?.databaseName ?? "esp-board-vault" }}
+          </div>
+          <div class="database-path mono mt-3">
+            {{ databaseLocation?.indexedDbPath ?? "Loading..." }}
+          </div>
+        </div>
+        <v-btn
+          variant="outlined"
+          prepend-icon="mdi-content-copy"
+          :disabled="!databaseLocation"
+          :loading="copyingDatabaseLocation"
+          @click="copyDatabaseLocation"
+        >
+          Copy location
+        </v-btn>
+      </v-card-text>
+      <v-divider />
+      <v-card-text class="settings-row">
         <div>
-          <div class="font-weight-medium">Database backup</div>
+          <div class="font-weight-medium">Backup</div>
           <div class="text-body-2 muted mt-1">
             Export or restore the local vault database.
           </div>
@@ -271,6 +332,17 @@ function totalRecords(summary: VaultBackupSummary): number {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.settings-detail {
+  min-width: 0;
+}
+
+.database-path {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: #2f352f;
+  font-size: 0.84rem;
 }
 
 .backup-summary {

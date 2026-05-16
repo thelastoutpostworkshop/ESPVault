@@ -18,6 +18,7 @@ import path from "node:path";
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const SERIAL_SELECTION_COUNT_CHANNEL = "serial:get-last-selection-count";
 const CLIPBOARD_WRITE_TEXT_CHANNEL = "clipboard:write-text";
+const DATABASE_LOCATION_CHANNEL = "database:get-location";
 const WINDOW_RESET_SIZE_CHANNEL = "window:reset-size";
 const BACKUP_SAVE_CHANNEL = "backup:save";
 const BACKUP_OPEN_CHANNEL = "backup:open";
@@ -60,6 +61,7 @@ ipcMain.handle(CLIPBOARD_WRITE_TEXT_CHANNEL, (_event, text: unknown) => {
 
   clipboard.writeText(text);
 });
+ipcMain.handle(DATABASE_LOCATION_CHANNEL, () => getDatabaseLocation());
 ipcMain.handle(WINDOW_RESET_SIZE_CHANNEL, (event) => {
   const window = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
 
@@ -244,6 +246,20 @@ function ensureVaultDataDirectory(): string {
   const directory = path.join(app.getPath("userData"), "esp-board-vault");
   mkdirSync(directory, { recursive: true });
   return directory;
+}
+
+function getDatabaseLocation(): {
+  databaseName: string;
+  indexedDbPath: string;
+  userDataPath: string;
+} {
+  const userDataPath = app.getPath("userData");
+
+  return {
+    databaseName: "esp-board-vault",
+    indexedDbPath: path.join(userDataPath, "IndexedDB"),
+    userDataPath
+  };
 }
 
 function parseBackupSaveRequest(request: unknown): {

@@ -21,6 +21,14 @@ const api: EspBoardVaultApi = {
     writeText: (text) =>
       ipcRenderer.invoke("clipboard:write-text", text) as Promise<void>
   },
+  database: {
+    getLocation: () =>
+      ipcRenderer.invoke("database:get-location") as Promise<{
+        databaseName: string;
+        indexedDbPath: string;
+        userDataPath: string;
+      }>
+  },
   serial: {
     getLastSelectionCount: () =>
       ipcRenderer.invoke("serial:get-last-selection-count") as Promise<number>
