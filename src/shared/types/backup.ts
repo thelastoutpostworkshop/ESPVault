@@ -44,7 +44,7 @@ export interface VaultBackup {
   databaseName: string;
   schemaVersion: number;
   data: VaultBackupTables;
-  files: VaultBackupFile[];
+  files?: VaultBackupFile[];
 }
 
 export interface VaultBackupSummary {
@@ -125,8 +125,8 @@ export function summarizeVaultBackup(backup: VaultBackup): VaultBackupSummary {
       pinAssignments: backup.data.pinAssignments.length,
       appSettings: backup.data.appSettings.length
     },
-    fileCount: backup.files.length,
-    fileSizeBytes: backup.files.reduce(
+    fileCount: (backup.files ?? []).length,
+    fileSizeBytes: (backup.files ?? []).reduce(
       (total, file) => total + (file.sizeBytes ?? 0),
       0
     )

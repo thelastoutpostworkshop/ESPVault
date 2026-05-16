@@ -8,8 +8,8 @@ const api: EspBoardVaultApi = {
       filePath?: string;
       content?: string;
     }>,
-    restoreFiles: (content) =>
-      ipcRenderer.invoke("backup:restore-files", content) as Promise<{
+    restoreFiles: (request) =>
+      ipcRenderer.invoke("backup:restore-files", request) as Promise<{
         content: string;
         restoredFileCount: number;
       }>,
@@ -21,6 +21,7 @@ const api: EspBoardVaultApi = {
         canceled: boolean;
         filePath?: string;
         includedFileCount?: number;
+        includedFileSizeBytes?: number;
       }>
   },
   clipboard: {
@@ -50,7 +51,8 @@ const api: EspBoardVaultApi = {
       }>,
     getPendingMove: () =>
       ipcRenderer.invoke("database:get-pending-move") as Promise<{
-        content: string;
+        content?: string;
+        filePath?: string;
       } | null>
   },
   projectImages: {

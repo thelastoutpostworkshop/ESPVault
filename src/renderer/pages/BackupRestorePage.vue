@@ -21,6 +21,7 @@ const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
 const pendingImport = ref<{
   backup: VaultBackup;
+  filePath: string;
   summary: VaultBackupSummary;
 } | null>(null);
 
@@ -70,10 +71,21 @@ async function openBackup(): Promise<void> {
       throw new Error("Backup file was empty.");
     }
 
+    if (!result.filePath) {
+      throw new Error("Backup file path was not available.");
+    }
+
     const backup = parseVaultBackup(JSON.parse(result.content) as unknown);
+    const summary = summarizeVaultBackup(backup);
+
     pendingImport.value = {
       backup,
-      summary: summarizeVaultBackup(backup)
+      filePath: result.filePath,
+      summary: {
+        ...summary,
+        fileCount: result.includedFileCount ?? summary.fileCount,
+        fileSizeBytes: result.includedFileSizeBytes ?? summary.fileSizeBytes
+      }
     };
   } catch (caughtError) {
     error.value =
@@ -96,7 +108,7 @@ async function importBackup(): Promise<void> {
 
   try {
     const restoredBackup = await window.api.backup.restoreFiles(
-      JSON.stringify(pendingImport.value.backup)
+      { filePath: pendingImport.value.filePath }
     );
     const backup = parseVaultBackup(JSON.parse(restoredBackup.content) as unknown);
     const summary = await backupRepository.importBackup(backup);
@@ -118,7 +130,7 @@ async function importBackup(): Promise<void> {
 
 function buildBackupFileName(): string {
   const timestamp = new Date().toISOString().replaceAll(":", "-").slice(0, 19);
-  return `esp-board-vault-backup-${timestamp}.json`;
+  return `esp-board-vault-backup-${timestamp}.zip`;
 }
 
 function totalRecords(summary: VaultBackupSummary): number {
@@ -132,7 +144,7 @@ function totalRecords(summary: VaultBackupSummary): number {
       <div>
         <h1 class="page-title">Backup & Restore</h1>
         <p class="page-subtitle">
-          Export or restore the vault database and copied image files.
+          Export or restore one ZIP file containing the vault database and copied images.
         </p>
       </div>
     </div>
@@ -155,7 +167,7 @@ function totalRecords(summary: VaultBackupSummary): number {
           <div>
             <div class="font-weight-medium">Create a backup file</div>
             <div class="text-body-2 muted mt-1">
-              Includes boards, projects, firmware records, settings, and copied images.
+              Creates one .zip with backup.json plus copied images under attachments/.
             </div>
           </div>
           <v-btn

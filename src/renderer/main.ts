@@ -12,9 +12,7 @@ async function restorePendingDatabaseMove(): Promise<void> {
     return;
   }
 
-  const restoredBackup = await window.api.backup.restoreFiles(
-    pendingMove.content
-  );
+  const restoredBackup = await window.api.backup.restoreFiles(pendingMove);
   const backup = parseVaultBackup(JSON.parse(restoredBackup.content) as unknown);
   await repositories.backups.importBackup(backup);
   await window.api.database.clearPendingMove();

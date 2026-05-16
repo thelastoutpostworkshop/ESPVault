@@ -20,12 +20,12 @@ import {
   writeFileSync
 } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import path from "node:path";
 import {
   parseVaultBackup,
   type VaultBackup,
-  type VaultBackupFile,
-  type VaultBackupFileKind
+  type VaultBackupFile
 } from "../shared/types/backup";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -73,6 +73,29 @@ interface SelectableSerialPort {
   serialNumber?: string;
 }
 
+interface BackupPackage {
+  includedFileCount: number;
+  includedFileSizeBytes: number;
+  zipBuffer: Buffer;
+}
+
+interface BackupOpenPackage {
+  backup: VaultBackup;
+  includedFileCount: number;
+  includedFileSizeBytes: number;
+}
+
+interface ZipEntryInput {
+  data: Buffer;
+  path: string;
+}
+
+interface ZipEntry {
+  data: Buffer;
+  path: string;
+  uncompressedSize: number;
+}
+
 app.setName("ESP Board Vault");
 applyConfiguredUserDataPath();
 
@@ -88,8 +111,6 @@ ipcMain.handle(DATABASE_CHANGE_LOCATION_CHANNEL, async (event, backupContent) =>
   if (typeof backupContent !== "string" || !backupContent.trim()) {
     throw new Error("App data move content is invalid.");
   }
-
-  const packagedBackup = buildBackupContentWithFiles(backupContent);
 
   const result = await showOpenDialogForSender(event.sender, {
     title: "Choose app data location",
@@ -114,7 +135,8 @@ ipcMain.handle(DATABASE_CHANGE_LOCATION_CHANNEL, async (event, backupContent) =>
   }
 
   assertDatabaseLocationTarget(targetUserDataPath, currentUserDataPath);
-  writePendingDatabaseMove(targetUserDataPath, packagedBackup.content);
+  const packagedBackup = buildBackupZipArchive(backupContent);
+  writePendingDatabaseMove(targetUserDataPath, packagedBackup.zipBuffer);
   writeWindowSizeForMove(targetUserDataPath);
   writeDatabaseLocationConfig(targetUserDataPath);
   scheduleRelaunch();
@@ -142,13 +164,13 @@ ipcMain.handle(WINDOW_RESET_SIZE_CHANNEL, (event) => {
 });
 ipcMain.handle(BACKUP_SAVE_CHANNEL, async (event, request: unknown) => {
   const backupRequest = parseBackupSaveRequest(request);
-  const packagedBackup = buildBackupContentWithFiles(backupRequest.content);
+  const packagedBackup = buildBackupZipArchive(backupRequest.content);
   const result = await showSaveDialogForSender(event.sender, {
     title: "Export backup",
     defaultPath: backupRequest.defaultFileName,
     filters: [
-      { name: "ESP Board Vault Backup", extensions: ["json"] },
-      { name: "JSON", extensions: ["json"] }
+      { name: "ESP Board Vault Backup", extensions: ["zip"] },
+      { name: "ZIP", extensions: ["zip"] }
     ]
   });
 
@@ -156,11 +178,12 @@ ipcMain.handle(BACKUP_SAVE_CHANNEL, async (event, request: unknown) => {
     return { canceled: true };
   }
 
-  writeFileSync(result.filePath, packagedBackup.content, "utf8");
+  writeFileSync(result.filePath, packagedBackup.zipBuffer);
   return {
     canceled: false,
     filePath: result.filePath,
-    includedFileCount: packagedBackup.includedFileCount
+    includedFileCount: packagedBackup.includedFileCount,
+    includedFileSizeBytes: packagedBackup.includedFileSizeBytes
   };
 });
 ipcMain.handle(BACKUP_OPEN_CHANNEL, async (event) => {
@@ -168,7 +191,8 @@ ipcMain.handle(BACKUP_OPEN_CHANNEL, async (event) => {
     title: "Import backup",
     properties: ["openFile"],
     filters: [
-      { name: "ESP Board Vault Backup", extensions: ["json"] },
+      { name: "ESP Board Vault Backup", extensions: ["zip", "json"] },
+      { name: "ZIP", extensions: ["zip"] },
       { name: "JSON", extensions: ["json"] }
     ]
   });
@@ -178,18 +202,18 @@ ipcMain.handle(BACKUP_OPEN_CHANNEL, async (event) => {
   }
 
   const filePath = result.filePaths[0];
+  const backupPackage = readBackupPackage(filePath);
+
   return {
     canceled: false,
     filePath,
-    content: readFileSync(filePath, "utf8")
+    content: formatBackupContent(backupPackage.backup),
+    includedFileCount: backupPackage.includedFileCount,
+    includedFileSizeBytes: backupPackage.includedFileSizeBytes
   };
 });
-ipcMain.handle(BACKUP_RESTORE_FILES_CHANNEL, (_event, content: unknown) => {
-  if (typeof content !== "string" || !content.trim()) {
-    throw new Error("Backup content is invalid.");
-  }
-
-  return restoreBackupFiles(content);
+ipcMain.handle(BACKUP_RESTORE_FILES_CHANNEL, (_event, request: unknown) => {
+  return restoreBackupFiles(parseBackupRestoreFilesRequest(request));
 });
 ipcMain.handle(PROJECT_IMAGE_CHOOSE_COVER_CHANNEL, async (event, request) => {
   const { projectId } = parseProjectImageChooseRequest(request);
@@ -467,11 +491,11 @@ function assertDatabaseLocationTarget(
 
 function writePendingDatabaseMove(
   targetUserDataPath: string,
-  backupContent: string
+  backupContent: Buffer
 ): void {
   const pendingMovePath = getPendingDatabaseMoveFilePath(targetUserDataPath);
   mkdirSync(path.dirname(pendingMovePath), { recursive: true });
-  writeFileSync(pendingMovePath, backupContent, "utf8");
+  writeFileSync(pendingMovePath, backupContent);
 }
 
 function writeWindowSizeForMove(targetUserDataPath: string): void {
@@ -495,16 +519,26 @@ function writeWindowSizeForMove(targetUserDataPath: string): void {
   );
 }
 
-function readPendingDatabaseMove(): { content: string } | null {
+function readPendingDatabaseMove(): { content?: string; filePath?: string } | null {
   const pendingMovePath = getPendingDatabaseMoveFilePath(app.getPath("userData"));
 
-  if (!existsSync(pendingMovePath)) {
-    return null;
+  if (existsSync(pendingMovePath)) {
+    return {
+      filePath: pendingMovePath
+    };
   }
 
-  return {
-    content: readFileSync(pendingMovePath, "utf8")
-  };
+  const legacyPendingMovePath = getLegacyPendingDatabaseMoveFilePath(
+    app.getPath("userData")
+  );
+
+  if (existsSync(legacyPendingMovePath)) {
+    return {
+      content: readFileSync(legacyPendingMovePath, "utf8")
+    };
+  }
+
+  return null;
 }
 
 function clearPendingDatabaseMove(): void {
@@ -513,9 +547,21 @@ function clearPendingDatabaseMove(): void {
   if (existsSync(pendingMovePath)) {
     unlinkSync(pendingMovePath);
   }
+
+  const legacyPendingMovePath = getLegacyPendingDatabaseMoveFilePath(
+    app.getPath("userData")
+  );
+
+  if (existsSync(legacyPendingMovePath)) {
+    unlinkSync(legacyPendingMovePath);
+  }
 }
 
 function getPendingDatabaseMoveFilePath(userDataPath: string): string {
+  return path.join(userDataPath, "esp-board-vault", "pending-database-move.zip");
+}
+
+function getLegacyPendingDatabaseMoveFilePath(userDataPath: string): string {
   return path.join(userDataPath, "esp-board-vault", "pending-database-move.json");
 }
 
@@ -564,26 +610,122 @@ function parseBackupSaveRequest(request: unknown): {
   return { content, defaultFileName };
 }
 
-function buildBackupContentWithFiles(content: string): {
-  content: string;
-  includedFileCount: number;
+function parseBackupRestoreFilesRequest(request: unknown): {
+  content?: string;
+  filePath?: string;
 } {
+  if (
+    typeof request !== "object" ||
+    request === null ||
+    Array.isArray(request)
+  ) {
+    throw new Error("Backup restore request is invalid.");
+  }
+
+  const { content, filePath } = request as Record<string, unknown>;
+  const parsedRequest = {
+    content: typeof content === "string" && content.trim() ? content : undefined,
+    filePath: typeof filePath === "string" && filePath.trim() ? filePath : undefined
+  };
+
+  if (!parsedRequest.content && !parsedRequest.filePath) {
+    throw new Error("Backup restore request is incomplete.");
+  }
+
+  return parsedRequest;
+}
+
+function buildBackupZipArchive(content: string): BackupPackage {
   const backup = parseBackupContent(content);
-  const files = collectBackupImageFiles(backup);
+  const backupForArchive = cloneBackupWithoutLegacyFiles(backup);
+  const attachmentEntries = collectBackupAttachmentEntries(backupForArchive);
+  const archiveEntries: ZipEntryInput[] = [
+    {
+      path: "backup.json",
+      data: Buffer.from(formatBackupContent(backupForArchive), "utf8")
+    },
+    ...attachmentEntries.map((entry) => ({
+      path: entry.path,
+      data: readFileSync(entry.sourcePath)
+    }))
+  ];
 
   return {
-    content: formatBackupContent({ ...backup, files }),
-    includedFileCount: files.length
+    zipBuffer: createZipArchive(archiveEntries),
+    includedFileCount: attachmentEntries.length,
+    includedFileSizeBytes: attachmentEntries.reduce(
+      (total, entry) => total + entry.sizeBytes,
+      0
+    )
   };
 }
 
-function restoreBackupFiles(content: string): {
+function restoreBackupFiles(request: {
+  content?: string;
+  filePath?: string;
+}): {
+  content: string;
+  restoredFileCount: number;
+} {
+  if (request.filePath) {
+    const filePath = path.resolve(request.filePath);
+    const fileBuffer = readFileSync(filePath);
+
+    if (isZipBuffer(fileBuffer)) {
+      return restoreZipBackup(fileBuffer);
+    }
+
+    return restoreLegacyJsonBackup(fileBuffer.toString("utf8"));
+  }
+
+  if (!request.content) {
+    throw new Error("Backup restore request is incomplete.");
+  }
+
+  return restoreLegacyJsonBackup(request.content);
+}
+
+function restoreZipBackup(zipBuffer: Buffer): {
+  content: string;
+  restoredFileCount: number;
+} {
+  const zipEntries = readZipArchive(zipBuffer);
+  const backupEntry = zipEntries.find((entry) => entry.path === "backup.json");
+  if (!backupEntry) {
+    throw new Error("Backup archive is missing backup.json.");
+  }
+
+  const backup = parseBackupContent(backupEntry.data.toString("utf8"));
+  let restoredFileCount = 0;
+
+  for (const entry of zipEntries) {
+    if (!isRestorableAttachmentPath(entry.path)) {
+      continue;
+    }
+
+    const targetPath = getBackupAttachmentRestorePath(entry.path);
+    mkdirSync(path.dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, entry.data);
+    restoredFileCount += 1;
+  }
+
+  rewriteBackupAttachmentPaths(backup);
+
+  return {
+    content: formatBackupContent(backup),
+    restoredFileCount
+  };
+}
+
+function restoreLegacyJsonBackup(content: string): {
   content: string;
   restoredFileCount: number;
 } {
   const backup = parseBackupContent(content);
+  const legacyFiles = backup.files ?? [];
 
-  if (!backup.files.length) {
+  if (!legacyFiles.length) {
+    rewriteBackupAttachmentPaths(backup);
     return {
       content: formatBackupContent(backup),
       restoredFileCount: 0
@@ -592,42 +734,87 @@ function restoreBackupFiles(content: string): {
 
   let restoredFileCount = 0;
 
-  for (const file of backup.files) {
-    const targetPath = getBackupFileRestorePath(file);
+  for (const file of legacyFiles) {
+    const targetPath = getBackupAttachmentRestorePath(file.relativePath);
     mkdirSync(path.dirname(targetPath), { recursive: true });
     writeFileSync(targetPath, Buffer.from(file.contentBase64, "base64"));
     restoredFileCount += 1;
 
-    if (file.kind === "project_cover") {
-      const project = backup.data.projects.find(
-        (item) => item.id === file.ownerId
-      );
-
-      if (project) {
-        project.coverImagePath = targetPath;
-        project.coverImageFilename = file.filename;
-        project.coverImageMimeType = file.mimeType;
-        project.coverImageSizeBytes = file.sizeBytes;
-      }
-    }
-
-    if (file.kind === "attachment_image") {
-      const attachment = backup.data.attachments.find(
-        (item) => item.id === file.ownerId
-      );
-
-      if (attachment) {
-        attachment.localPath = targetPath;
-        attachment.filename = file.filename;
-        attachment.mimeType = file.mimeType;
-        attachment.sizeBytes = file.sizeBytes;
-      }
-    }
+    rewriteLegacyBackupFilePath(backup, file, targetPath);
   }
+
+  delete backup.files;
 
   return {
     content: formatBackupContent(backup),
     restoredFileCount
+  };
+}
+
+function rewriteLegacyBackupFilePath(
+  backup: VaultBackup,
+  file: VaultBackupFile,
+  targetPath: string
+): void {
+  if (file.kind === "project_cover") {
+    const project = backup.data.projects.find((item) => item.id === file.ownerId);
+
+    if (project) {
+      project.coverImagePath = targetPath;
+      project.coverImageFilename = file.filename;
+      project.coverImageMimeType = file.mimeType;
+      project.coverImageSizeBytes = file.sizeBytes;
+    }
+  }
+
+  if (file.kind === "attachment_image") {
+    const attachment = backup.data.attachments.find(
+      (item) => item.id === file.ownerId
+    );
+
+    if (attachment) {
+      attachment.localPath = targetPath;
+      attachment.filename = file.filename;
+      attachment.mimeType = file.mimeType;
+      attachment.sizeBytes = file.sizeBytes;
+    }
+  }
+}
+
+function readBackupPackage(filePath: string): BackupOpenPackage {
+  const fileBuffer = readFileSync(filePath);
+
+  if (isZipBuffer(fileBuffer)) {
+    const zipEntries = readZipArchive(fileBuffer);
+    const backupEntry = zipEntries.find((entry) => entry.path === "backup.json");
+    if (!backupEntry) {
+      throw new Error("Backup archive is missing backup.json.");
+    }
+
+    const attachmentEntries = zipEntries.filter((entry) =>
+      isRestorableAttachmentPath(entry.path)
+    );
+
+    return {
+      backup: parseBackupContent(backupEntry.data.toString("utf8")),
+      includedFileCount: attachmentEntries.length,
+      includedFileSizeBytes: attachmentEntries.reduce(
+        (total, entry) => total + entry.uncompressedSize,
+        0
+      )
+    };
+  }
+
+  const backup = parseBackupContent(fileBuffer.toString("utf8"));
+  const legacyFiles = backup.files ?? [];
+
+  return {
+    backup,
+    includedFileCount: legacyFiles.length,
+    includedFileSizeBytes: legacyFiles.reduce(
+      (total, file) => total + (file.sizeBytes ?? 0),
+      0
+    )
   };
 }
 
@@ -639,8 +826,22 @@ function formatBackupContent(backup: VaultBackup): string {
   return `${JSON.stringify(backup, null, 2)}\n`;
 }
 
-function collectBackupImageFiles(backup: VaultBackup): VaultBackupFile[] {
-  const files: VaultBackupFile[] = [];
+function cloneBackupWithoutLegacyFiles(backup: VaultBackup): VaultBackup {
+  const clone = structuredClone(backup) as VaultBackup;
+  delete clone.files;
+  return clone;
+}
+
+function collectBackupAttachmentEntries(backup: VaultBackup): Array<{
+  path: string;
+  sizeBytes: number;
+  sourcePath: string;
+}> {
+  const entries: Array<{
+    path: string;
+    sizeBytes: number;
+    sourcePath: string;
+  }> = [];
   const seen = new Set<string>();
 
   for (const project of backup.data.projects) {
@@ -648,17 +849,12 @@ function collectBackupImageFiles(backup: VaultBackup): VaultBackupFile[] {
       continue;
     }
 
-    const file = readBackupImageFile({
-      kind: "project_cover",
-      ownerId: project.id,
-      sourcePath: project.coverImagePath,
-      filename: project.coverImageFilename,
-      mimeType: project.coverImageMimeType
-    });
+    const entry = createBackupAttachmentEntry(project.coverImagePath);
 
-    if (file && !seen.has(file.id)) {
-      seen.add(file.id);
-      files.push(file);
+    if (entry && !seen.has(entry.path)) {
+      seen.add(entry.path);
+      entries.push(entry);
+      project.coverImagePath = entry.path;
     }
   }
 
@@ -667,45 +863,33 @@ function collectBackupImageFiles(backup: VaultBackup): VaultBackupFile[] {
       continue;
     }
 
-    const file = readBackupImageFile({
-      kind: "attachment_image",
-      ownerId: attachment.id,
-      sourcePath: attachment.localPath,
-      filename: attachment.filename,
-      mimeType: attachment.mimeType
-    });
+    const entry = createBackupAttachmentEntry(attachment.localPath);
 
-    if (file && !seen.has(file.id)) {
-      seen.add(file.id);
-      files.push(file);
+    if (entry && !seen.has(entry.path)) {
+      seen.add(entry.path);
+      entries.push(entry);
+      attachment.localPath = entry.path;
     }
   }
 
-  return files;
+  return entries;
 }
 
-function readBackupImageFile(input: {
-  kind: VaultBackupFileKind;
-  ownerId: string;
+function createBackupAttachmentEntry(sourcePath: string): {
+  path: string;
+  sizeBytes: number;
   sourcePath: string;
-  filename: string | null;
-  mimeType: string | null;
-}): VaultBackupFile | null {
-  const sourcePath = input.sourcePath.trim();
+} | null {
+  const trimmedSourcePath = sourcePath.trim();
 
-  if (!sourcePath) {
+  if (!trimmedSourcePath) {
     return null;
   }
 
-  const resolvedPath = path.resolve(sourcePath);
+  const resolvedPath = path.resolve(trimmedSourcePath);
   const vaultDirectory = ensureVaultDataDirectory();
 
   if (!isPathInside(resolvedPath, vaultDirectory) || !existsSync(resolvedPath)) {
-    return null;
-  }
-
-  const mimeType = input.mimeType ?? getImageMimeType(resolvedPath);
-  if (!mimeType?.startsWith("image/")) {
     return null;
   }
 
@@ -714,19 +898,10 @@ function readBackupImageFile(input: {
     return null;
   }
 
-  const relativePath = toVaultRelativePath(resolvedPath);
-  const filename = input.filename?.trim() || path.basename(resolvedPath);
-
   return {
-    id: `${input.kind}:${input.ownerId}:${relativePath}`,
-    kind: input.kind,
-    ownerId: input.ownerId,
-    filename,
-    originalPath: resolvedPath,
-    relativePath,
-    mimeType,
+    path: toVaultRelativePath(resolvedPath),
     sizeBytes: stats.size,
-    contentBase64: readFileSync(resolvedPath).toString("base64")
+    sourcePath: resolvedPath
   };
 }
 
@@ -741,9 +916,31 @@ function toVaultRelativePath(filePath: string): string {
     .join("/");
 }
 
-function getBackupFileRestorePath(file: VaultBackupFile): string {
+function rewriteBackupAttachmentPaths(backup: VaultBackup): void {
+  for (const project of backup.data.projects) {
+    if (project.coverImagePath) {
+      project.coverImagePath = resolveRestoredAttachmentPath(project.coverImagePath);
+    }
+  }
+
+  for (const attachment of backup.data.attachments) {
+    if (attachment.localPath) {
+      attachment.localPath = resolveRestoredAttachmentPath(attachment.localPath);
+    }
+  }
+
+  delete backup.files;
+}
+
+function resolveRestoredAttachmentPath(value: string): string {
+  return isRestorableAttachmentPath(value)
+    ? getBackupAttachmentRestorePath(value)
+    : value;
+}
+
+function getBackupAttachmentRestorePath(relativePath: string): string {
   const normalizedRelativePath = path.normalize(
-    file.relativePath.replaceAll("/", path.sep)
+    relativePath.replaceAll("/", path.sep)
   );
 
   if (
@@ -764,6 +961,254 @@ function getBackupFileRestorePath(file: VaultBackupFile): string {
   }
 
   return targetPath;
+}
+
+function isZipBuffer(buffer: Buffer): boolean {
+  return buffer.length >= 4 && buffer.readUInt32LE(0) === 0x04034b50;
+}
+
+function isRestorableAttachmentPath(value: string): boolean {
+  const normalizedPath = value.replaceAll("\\", "/");
+
+  return (
+    normalizedPath.startsWith("attachments/") &&
+    !normalizedPath.endsWith("/") &&
+    !path.isAbsolute(normalizedPath) &&
+    !normalizedPath.split("/").includes("..")
+  );
+}
+
+function createZipArchive(entries: ZipEntryInput[]): Buffer {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const normalizedPath = normalizeZipEntryPath(entry.path);
+    const nameBuffer = Buffer.from(normalizedPath, "utf8");
+    const compressedData = deflateRawSync(entry.data);
+    const crc = crc32(entry.data);
+    const { date, time } = getCurrentDosDateTime();
+
+    assertZipUint32(entry.data.length, "Backup entry is too large.");
+    assertZipUint32(compressedData.length, "Compressed backup entry is too large.");
+    assertZipUint32(offset, "Backup archive is too large.");
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(8, 8);
+    localHeader.writeUInt16LE(time, 10);
+    localHeader.writeUInt16LE(date, 12);
+    localHeader.writeUInt32LE(crc, 14);
+    localHeader.writeUInt32LE(compressedData.length, 18);
+    localHeader.writeUInt32LE(entry.data.length, 22);
+    localHeader.writeUInt16LE(nameBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x0800, 8);
+    centralHeader.writeUInt16LE(8, 10);
+    centralHeader.writeUInt16LE(time, 12);
+    centralHeader.writeUInt16LE(date, 14);
+    centralHeader.writeUInt32LE(crc, 16);
+    centralHeader.writeUInt32LE(compressedData.length, 20);
+    centralHeader.writeUInt32LE(entry.data.length, 24);
+    centralHeader.writeUInt16LE(nameBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+
+    localParts.push(localHeader, nameBuffer, compressedData);
+    centralParts.push(centralHeader, nameBuffer);
+    offset += localHeader.length + nameBuffer.length + compressedData.length;
+  }
+
+  const centralDirectoryOffset = offset;
+  const centralDirectory = Buffer.concat(centralParts);
+  const centralDirectorySize = centralDirectory.length;
+
+  assertZipUint32(centralDirectoryOffset, "Backup archive is too large.");
+  assertZipUint32(centralDirectorySize, "Backup archive is too large.");
+
+  const endOfCentralDirectory = Buffer.alloc(22);
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(0, 4);
+  endOfCentralDirectory.writeUInt16LE(0, 6);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 8);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectorySize, 12);
+  endOfCentralDirectory.writeUInt32LE(centralDirectoryOffset, 16);
+  endOfCentralDirectory.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, centralDirectory, endOfCentralDirectory]);
+}
+
+function readZipArchive(zipBuffer: Buffer): ZipEntry[] {
+  const endOfCentralDirectoryOffset = findEndOfCentralDirectory(zipBuffer);
+  const entryCount = zipBuffer.readUInt16LE(endOfCentralDirectoryOffset + 10);
+  const centralDirectoryOffset = zipBuffer.readUInt32LE(
+    endOfCentralDirectoryOffset + 16
+  );
+  const entries: ZipEntry[] = [];
+  let offset = centralDirectoryOffset;
+
+  for (let index = 0; index < entryCount; index += 1) {
+    assertZipSignature(zipBuffer, offset, 0x02014b50, "Invalid ZIP directory.");
+
+    const method = zipBuffer.readUInt16LE(offset + 10);
+    const expectedCrc = zipBuffer.readUInt32LE(offset + 16);
+    const compressedSize = zipBuffer.readUInt32LE(offset + 20);
+    const uncompressedSize = zipBuffer.readUInt32LE(offset + 24);
+    const fileNameLength = zipBuffer.readUInt16LE(offset + 28);
+    const extraLength = zipBuffer.readUInt16LE(offset + 30);
+    const commentLength = zipBuffer.readUInt16LE(offset + 32);
+    const localHeaderOffset = zipBuffer.readUInt32LE(offset + 42);
+    const nameStart = offset + 46;
+    const nameEnd = nameStart + fileNameLength;
+    const entryPath = normalizeZipEntryPath(
+      zipBuffer.subarray(nameStart, nameEnd).toString("utf8")
+    );
+
+    offset = nameEnd + extraLength + commentLength;
+
+    if (entryPath.endsWith("/")) {
+      continue;
+    }
+
+    assertZipSignature(
+      zipBuffer,
+      localHeaderOffset,
+      0x04034b50,
+      "Invalid ZIP file entry."
+    );
+
+    const localFileNameLength = zipBuffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = zipBuffer.readUInt16LE(localHeaderOffset + 28);
+    const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+    const dataEnd = dataStart + compressedSize;
+    const compressedData = zipBuffer.subarray(dataStart, dataEnd);
+    const data =
+      method === 0
+        ? Buffer.from(compressedData)
+        : method === 8
+          ? inflateRawSync(compressedData)
+          : null;
+
+    if (!data) {
+      throw new Error("Backup archive uses an unsupported compression method.");
+    }
+
+    if (data.length !== uncompressedSize || crc32(data) !== expectedCrc) {
+      throw new Error("Backup archive contains a damaged file.");
+    }
+
+    entries.push({
+      data,
+      path: entryPath,
+      uncompressedSize
+    });
+  }
+
+  return entries;
+}
+
+function findEndOfCentralDirectory(zipBuffer: Buffer): number {
+  const minimumOffset = Math.max(0, zipBuffer.length - 65557);
+
+  for (let offset = zipBuffer.length - 22; offset >= minimumOffset; offset -= 1) {
+    if (zipBuffer.readUInt32LE(offset) === 0x06054b50) {
+      return offset;
+    }
+  }
+
+  throw new Error("Backup file is not a valid ZIP archive.");
+}
+
+function assertZipSignature(
+  zipBuffer: Buffer,
+  offset: number,
+  signature: number,
+  message: string
+): void {
+  if (offset < 0 || offset + 4 > zipBuffer.length) {
+    throw new Error(message);
+  }
+
+  if (zipBuffer.readUInt32LE(offset) !== signature) {
+    throw new Error(message);
+  }
+}
+
+function normalizeZipEntryPath(value: string): string {
+  const normalizedPath = value.replaceAll("\\", "/");
+
+  if (
+    !normalizedPath ||
+    path.isAbsolute(normalizedPath) ||
+    normalizedPath.split("/").includes("..")
+  ) {
+    throw new Error("Backup archive contains an unsafe file path.");
+  }
+
+  return normalizedPath;
+}
+
+function assertZipUint32(value: number, message: string): void {
+  if (value > 0xffffffff) {
+    throw new Error(message);
+  }
+}
+
+function getCurrentDosDateTime(): { date: number; time: number } {
+  const now = new Date();
+  const year = Math.max(now.getFullYear(), 1980);
+
+  return {
+    date:
+      ((year - 1980) << 9) |
+      ((now.getMonth() + 1) << 5) |
+      now.getDate(),
+    time:
+      (now.getHours() << 11) |
+      (now.getMinutes() << 5) |
+      Math.floor(now.getSeconds() / 2)
+  };
+}
+
+const CRC32_TABLE = createCrc32Table();
+
+function crc32(buffer: Buffer): number {
+  let crc = 0xffffffff;
+
+  for (const byte of buffer) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function createCrc32Table(): number[] {
+  const table: number[] = [];
+
+  for (let index = 0; index < 256; index += 1) {
+    let value = index;
+
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+
+    table[index] = value >>> 0;
+  }
+
+  return table;
 }
 
 function parseProjectImageChooseRequest(request: unknown): { projectId: string } {
