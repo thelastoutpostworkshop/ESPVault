@@ -1,6 +1,6 @@
 # ESP Vault
 
-ESP Vault is a local desktop notebook for ESP32 makers. It helps you keep
+ESP Vault is a local desktop inventory for ESP32 makers. It helps you keep
 track of boards, hardware details, projects, firmware notes, physical locations,
 and recovery information without using a cloud service.
 
