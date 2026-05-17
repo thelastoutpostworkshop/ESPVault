@@ -4,7 +4,6 @@ import AboutPage from "./pages/AboutPage.vue";
 import BackupRestorePage from "./pages/BackupRestorePage.vue";
 import BoardsPage from "./pages/BoardsPage.vue";
 import DashboardPage from "./pages/DashboardPage.vue";
-import PlaceholderPage from "./pages/PlaceholderPage.vue";
 import ProjectsPage from "./pages/ProjectsPage.vue";
 import ScanBoardPage from "./pages/ScanBoardPage.vue";
 import SettingsPage from "./pages/SettingsPage.vue";
@@ -14,7 +13,6 @@ type ViewKey =
   | "boards"
   | "scan"
   | "projects"
-  | "firmware"
   | "backup"
   | "about"
   | "settings";
@@ -42,7 +40,6 @@ const navItems: NavItem[] = [
   { key: "boards", title: "Boards", icon: "mdi-developer-board" },
   { key: "scan", title: "Scan board", icon: "mdi-usb-port" },
   { key: "projects", title: "Projects", icon: "mdi-folder-outline" },
-  { key: "firmware", title: "Firmware", icon: "mdi-chip" },
   { key: "backup", title: "Backup & Restore", icon: "mdi-database-sync-outline" },
   { key: "settings", title: "Settings", icon: "mdi-cog-outline" },
   { key: "about", title: "About", icon: "mdi-information-outline" }
@@ -75,20 +72,9 @@ const viewComponents: Record<ViewKey, Component> = {
   boards: BoardsPage,
   scan: ScanBoardPage,
   projects: ProjectsPage,
-  firmware: PlaceholderPage,
   backup: BackupRestorePage,
   about: AboutPage,
   settings: SettingsPage
-};
-
-const placeholderCopy: Record<
-  Exclude<ViewKey, "dashboard" | "boards" | "scan" | "projects" | "backup" | "about" | "settings">,
-  { title: string; description: string }
-> = {
-  firmware: {
-    title: "Firmware",
-    description: "Firmware history will be added after board CRUD is stable."
-  }
 };
 
 const activeComponent = computed(() => viewComponents[currentView.value]);
@@ -99,10 +85,6 @@ const activeComponentProps = computed(() => {
 
   if (currentView.value === "scan") {
     return { scanRequestId: scanRequestId.value };
-  }
-
-  if (currentView.value in placeholderCopy) {
-    return placeholderCopy[currentView.value as keyof typeof placeholderCopy];
   }
 
   return {};
