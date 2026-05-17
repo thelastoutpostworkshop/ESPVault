@@ -76,6 +76,7 @@ const form = reactive<BoardForm>(emptyForm());
 const coverImageDataUrl = ref<string | null>(null);
 const coverImageLoading = ref(false);
 const coverImageLoadError = ref<string | null>(null);
+const coverImageViewerOpen = ref(false);
 const projectStore = useProjectStore();
 const { projects } = storeToRefs(projectStore);
 const isEditing = computed(() => Boolean(props.board));
@@ -128,6 +129,7 @@ watch(
     coverImageDataUrl.value = null;
     coverImageLoadError.value = null;
     coverImageLoading.value = false;
+    coverImageViewerOpen.value = false;
   },
   { immediate: true }
 );
@@ -229,6 +231,7 @@ function resetForm(board: Board | null): void {
 }
 
 function close(): void {
+  coverImageViewerOpen.value = false;
   emit("update:modelValue", false);
 }
 
@@ -236,6 +239,7 @@ async function loadCoverImage(localPath: string | null): Promise<void> {
   const token = ++coverImageLoadToken;
   coverImageDataUrl.value = null;
   coverImageLoadError.value = null;
+  coverImageViewerOpen.value = false;
 
   if (!localPath) {
     coverImageLoading.value = false;
@@ -273,6 +277,12 @@ function chooseCoverImage(): void {
 function removeCoverImage(): void {
   if (props.board) {
     emit("remove-cover", props.board);
+  }
+}
+
+function openCoverImageViewer(): void {
+  if (coverImageDataUrl.value) {
+    coverImageViewerOpen.value = true;
   }
 }
 
@@ -383,13 +393,20 @@ function getCoverImageError(caughtError: unknown, fallback: string): string {
 
           <div class="board-cover-panel">
             <div class="board-cover-preview">
-              <v-img
+              <button
                 v-if="coverImageDataUrl"
-                :src="coverImageDataUrl"
-                alt=""
-                cover
-                height="150"
-              />
+                class="board-cover-viewer-trigger"
+                type="button"
+                :aria-label="`View ${board.coverImageFilename || 'board photo'}`"
+                @click="openCoverImageViewer"
+              >
+                <v-img
+                  :src="coverImageDataUrl"
+                  alt=""
+                  cover
+                  height="150"
+                />
+              </button>
               <div v-else class="board-cover-placeholder">
                 <v-icon icon="mdi-image-plus-outline" size="34" color="secondary" />
                 <div class="text-caption muted mt-1">No board photo</div>
@@ -711,6 +728,29 @@ function getCoverImageError(caughtError: unknown, fallback: string): string {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="coverImageViewerOpen" max-width="96vw">
+    <v-card class="cover-viewer-card">
+      <v-card-title class="cover-viewer-title">
+        <span>{{ board?.coverImageFilename || "Board photo" }}</span>
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          aria-label="Close board photo"
+          @click="coverImageViewerOpen = false"
+        />
+      </v-card-title>
+      <v-divider />
+      <v-card-text class="cover-viewer-body">
+        <img
+          v-if="coverImageDataUrl"
+          class="cover-viewer-image"
+          :src="coverImageDataUrl"
+          :alt="board?.coverImageFilename || 'Board photo'"
+        >
+      </v-card-text>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -738,6 +778,21 @@ function getCoverImageError(caughtError: unknown, fallback: string): string {
   background: #f4f6f1;
 }
 
+.board-cover-viewer-trigger {
+  display: block;
+  width: 100%;
+  min-height: 150px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.board-cover-viewer-trigger:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary));
+  outline-offset: -3px;
+}
+
 .board-cover-placeholder {
   display: grid;
   min-height: 150px;
@@ -757,5 +812,34 @@ function getCoverImageError(caughtError: unknown, fallback: string): string {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
+}
+
+.cover-viewer-card {
+  width: min-content;
+  max-width: 96vw;
+  max-height: 92vh;
+}
+
+.cover-viewer-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: min(520px, 90vw);
+}
+
+.cover-viewer-body {
+  max-width: 96vw;
+  max-height: 82vh;
+  overflow: auto;
+  padding: 12px;
+}
+
+.cover-viewer-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
 }
 </style>
