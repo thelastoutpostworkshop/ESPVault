@@ -7,6 +7,7 @@ import DashboardPage from "./pages/DashboardPage.vue";
 import ProjectsPage from "./pages/ProjectsPage.vue";
 import ScanBoardPage from "./pages/ScanBoardPage.vue";
 import SettingsPage from "./pages/SettingsPage.vue";
+import ToolsPage from "./pages/ToolsPage.vue";
 import { useVaultTheme } from "./composables/useVaultTheme";
 
 type ViewKey =
@@ -14,6 +15,7 @@ type ViewKey =
   | "boards"
   | "scan"
   | "projects"
+  | "tools"
   | "backup"
   | "about"
   | "settings";
@@ -42,6 +44,7 @@ const navItems: NavItem[] = [
   { key: "boards", title: "Boards", icon: "mdi-developer-board" },
   { key: "scan", title: "Scan board", icon: "mdi-usb-port" },
   { key: "projects", title: "Projects", icon: "mdi-folder-outline" },
+  { key: "tools", title: "Tools", icon: "mdi-tools" },
   { key: "backup", title: "Backup & Restore", icon: "mdi-database-sync-outline" },
   { key: "settings", title: "Settings", icon: "mdi-cog-outline" },
   { key: "about", title: "About", icon: "mdi-information-outline" }
@@ -74,6 +77,7 @@ const viewComponents: Record<ViewKey, Component> = {
   boards: BoardsPage,
   scan: ScanBoardPage,
   projects: ProjectsPage,
+  tools: ToolsPage,
   backup: BackupRestorePage,
   about: AboutPage,
   settings: SettingsPage
