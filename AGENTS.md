@@ -14,6 +14,37 @@ and no telemetry.
 
 Always include a short commit comment suggestion in the final response.
 
+## UI Style Guidelines
+
+Keep the interface colorful, modern, and professional for ESP32 makers. The app
+should feel like a focused electronics workbench: technical, clean, and useful,
+without looking childish or like a marketing landing page.
+
+Use the existing Vuetify theme system and shared renderer styles before adding
+one-off visual rules. Preserve both light and dark mode support when changing
+colors, surfaces, borders, shadows, chips, tables, cards, or empty states. Avoid
+hard-coded light-only colors in page-scoped styles; prefer Vuetify theme tokens
+and shared CSS variables from `src/renderer/styles.css`.
+
+Use consistent 8px rounded corners, subtle shadows, clear section spacing, and
+theme-aware borders. Cards should be used for real panels, repeated items, and
+tools, not as nested decoration. Keep operational pages dense enough for repeat
+use while still readable.
+
+Use icons for navigation, actions, tool cards, status chips, and empty states.
+Status chips should remain color-coded and easy to scan. Empty states should
+explain the next useful action and include a clear call to action when one is
+available.
+
+Prefer list/detail layouts for inventory management pages where records need a
+selected detail view. The Projects and Boards pages establish the current
+pattern: a selectable list on the left and a detailed record view on the right,
+collapsing responsively on smaller screens.
+
+Tools and external resources should be presented as curated in-app pages when
+they need descriptions or context. External links must continue to open through
+the typed preload API, not direct renderer Node.js or raw IPC.
+
 ## Technical Stack
 
 Use Electron, Vue 3, TypeScript, Vite, Vuetify 3, Pinia, Dexie, and
@@ -220,13 +251,6 @@ broken
 archived
 unknown
 ```
-
-## First Vertical Slice
-
-The first milestone is a working desktop app where a user can create, view,
-edit, and delete ESP32 board inventory records stored in local IndexedDB.
-Manual board creation is supported, and the scan screen should use
-`tasmota-webserial-esptool` for Web Serial based ESP detection.
 
 ## Definition of Done
 
