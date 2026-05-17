@@ -16,6 +16,9 @@ const PARTITION_ENTRY_MAGIC_LE = 0x50aa;
 const DEFAULT_PARTITION_TABLE_OFFSET = 0x8000;
 const PARTITION_ENTRY_SIZE = 32;
 const PARTITION_TABLE_LENGTH = 0xc00;
+const PARTITION_TABLE_MAX_ENTRIES = Math.trunc(
+  PARTITION_TABLE_LENGTH / PARTITION_ENTRY_SIZE
+);
 const PARTITION_ALIGNMENT = 0x1000;
 const PARTITION_TABLE_PROBE_OFFSETS = [
   0x8000,
@@ -46,8 +49,7 @@ export async function readBoardPartitionTable(
       );
     }
 
-    const data = await loader.readFlash(tableOffset, PARTITION_TABLE_LENGTH);
-    const partitions = parsePartitionTable(data);
+    const partitions = await readPartitionTableEntries(loader, tableOffset, logger);
 
     if (partitions.length) {
       logger.log(
@@ -102,6 +104,37 @@ async function probePartitionTableOffset(
   return null;
 }
 
+async function readPartitionTableEntries(
+  loader: ESPLoader,
+  tableOffset: number,
+  logger: Logger
+): Promise<BoardPartition[]> {
+  const partitions: BoardPartition[] = [];
+
+  logger.debug(
+    `Reading partition table entries at ${formatHex(
+      tableOffset,
+      4
+    )} in ${PARTITION_ENTRY_SIZE}-byte chunks.`
+  );
+
+  for (let index = 0; index < PARTITION_TABLE_MAX_ENTRIES; index += 1) {
+    const entryOffset = tableOffset + index * PARTITION_ENTRY_SIZE;
+    const data = await loader.readFlash(entryOffset, PARTITION_ENTRY_SIZE);
+
+    if (isPartitionTableEnd(data)) {
+      break;
+    }
+
+    const partition = parsePartitionEntry(data);
+    if (partition) {
+      partitions.push(partition);
+    }
+  }
+
+  return partitions;
+}
+
 function hasPlausiblePartitionEntry(data: Uint8Array): boolean {
   if (data.length < PARTITION_ENTRY_SIZE) {
     return false;
@@ -125,47 +158,51 @@ function hasPlausiblePartitionEntry(data: Uint8Array): boolean {
   );
 }
 
-function parsePartitionTable(data: Uint8Array): BoardPartition[] {
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  const decoder = new TextDecoder();
-  const partitions: BoardPartition[] = [];
-
-  for (let offset = 0; offset + PARTITION_ENTRY_SIZE <= data.length; offset += PARTITION_ENTRY_SIZE) {
-    const magic = view.getUint16(offset, true);
-
-    if (magic === 0xffff || magic === 0x0000) {
-      break;
-    }
-
-    if (magic !== PARTITION_ENTRY_MAGIC_LE) {
-      continue;
-    }
-
-    const type = view.getUint8(offset + 2);
-    const subtype = view.getUint8(offset + 3);
-    const partitionOffset = view.getUint32(offset + 4, true);
-    const sizeBytes = view.getUint32(offset + 8, true);
-    const flags = view.getUint32(offset + 28, true);
-    const labelBytes = data.subarray(offset + 12, offset + 28);
-    const label = decoder.decode(labelBytes).replace(/\0/g, "").trim();
-
-    partitions.push({
-      label: label || `type ${formatHex(type, 1)}`,
-      type,
-      typeHex: formatHex(type, 1),
-      subtype,
-      subtypeHex: formatHex(subtype, 1),
-      offset: partitionOffset,
-      offsetHex: formatHex(partitionOffset, 4),
-      sizeBytes,
-      sizeHex: formatHex(sizeBytes, 4),
-      flags,
-      flagsHex: formatHex(flags, 4),
-      filesystem: inferFilesystem(type, subtype)
-    });
+function isPartitionTableEnd(data: Uint8Array): boolean {
+  if (data.length < 2) {
+    return true;
   }
 
-  return partitions;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const magic = view.getUint16(0, true);
+  return magic === 0xffff || magic === 0x0000;
+}
+
+function parsePartitionEntry(data: Uint8Array): BoardPartition | null {
+  if (data.length < PARTITION_ENTRY_SIZE) {
+    return null;
+  }
+
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const magic = view.getUint16(0, true);
+
+  if (magic !== PARTITION_ENTRY_MAGIC_LE) {
+    return null;
+  }
+
+  const decoder = new TextDecoder();
+  const type = view.getUint8(2);
+  const subtype = view.getUint8(3);
+  const partitionOffset = view.getUint32(4, true);
+  const sizeBytes = view.getUint32(8, true);
+  const flags = view.getUint32(28, true);
+  const labelBytes = data.subarray(12, 28);
+  const label = decoder.decode(labelBytes).replace(/\0/g, "").trim();
+
+  return {
+    label: label || `type ${formatHex(type, 1)}`,
+    type,
+    typeHex: formatHex(type, 1),
+    subtype,
+    subtypeHex: formatHex(subtype, 1),
+    offset: partitionOffset,
+    offsetHex: formatHex(partitionOffset, 4),
+    sizeBytes,
+    sizeHex: formatHex(sizeBytes, 4),
+    flags,
+    flagsHex: formatHex(flags, 4),
+    filesystem: inferFilesystem(type, subtype)
+  };
 }
 
 function inferFilesystem(
