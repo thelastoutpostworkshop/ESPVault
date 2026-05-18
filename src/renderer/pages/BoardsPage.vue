@@ -456,10 +456,6 @@ function formatEnabledState(value: boolean | null): string {
 
   return value ? "Enabled" : "Disabled";
 }
-
-function formatBoardType(board: Board): string {
-  return board.boardType || board.manufacturer || "Not set";
-}
 </script>
 
 <template>
@@ -728,95 +724,6 @@ function formatBoardType(board: Board): string {
             </div>
           </div>
 
-          <div class="board-info-grid mt-5">
-            <div class="board-info-panel">
-              <div class="section-title">Hardware</div>
-              <div class="board-detail-row">
-                <span>Board type</span>
-                <strong>{{ formatBoardType(selectedBoard) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>PSRAM</span>
-                <strong>{{ formatPsramSize(selectedBoard.psramSizeBytes, selectedBoard.psramDetected) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Location</span>
-                <strong>{{ selectedBoard.physicalLocation || "Not set" }}</strong>
-              </div>
-            </div>
-
-            <div class="board-info-panel">
-              <div class="section-title">Scan metadata</div>
-              <div class="board-detail-row">
-                <span>Chip revision</span>
-                <strong>{{ selectedBoard.chipRevision ?? "Not set" }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Variant</span>
-                <strong>{{ selectedBoard.chipVariant || "Not set" }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Crystal</span>
-                <strong>{{ selectedBoard.crystalFrequency || "Not set" }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Flash chip</span>
-                <strong>{{ selectedBoard.flashManufacturerName || selectedBoard.flashChipIdHex || "Not set" }}</strong>
-              </div>
-            </div>
-
-            <div class="board-info-panel">
-              <div class="section-title">Security</div>
-              <div class="board-detail-row">
-                <span>Secure boot</span>
-                <strong>{{ formatEnabledState(selectedBoard.secureBootEnabled) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Flash encryption</span>
-                <strong>{{ formatEnabledState(selectedBoard.flashEncryptionEnabled) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Security flags</span>
-                <strong>{{ selectedBoard.securityFlagsHex || "Not set" }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Bootloader offset</span>
-                <strong>{{ selectedBoard.bootloaderOffsetHex || "Not set" }}</strong>
-              </div>
-            </div>
-
-            <div class="board-info-panel">
-              <div class="section-title">Record</div>
-              <div class="board-detail-row">
-                <span>Last connected</span>
-                <strong>{{ formatDate(selectedBoard.lastConnectedAt) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Last scan update</span>
-                <strong>{{ formatDate(selectedBoard.lastScannedAt) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Updated</span>
-                <strong>{{ formatDate(selectedBoard.updatedAt) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Created</span>
-                <strong>{{ formatDate(selectedBoard.createdAt) }}</strong>
-              </div>
-              <div class="board-detail-row">
-                <span>Board ID</span>
-                <strong class="metadata-mono">{{ selectedBoard.id }}</strong>
-              </div>
-            </div>
-
-            <div class="board-info-panel board-notes-panel">
-              <div class="section-title">Notes</div>
-              <p class="board-notes-text">
-                {{ selectedBoard.notes || "No notes yet" }}
-              </p>
-            </div>
-          </div>
-
           <div class="partitions-panel">
             <div class="partitions-header">
               <div>
@@ -942,6 +849,91 @@ function formatBoardType(board: Board): string {
                   Scan this board to read and save the ESP32 flash partition table.
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div class="board-info-grid mt-5">
+            <div class="board-info-panel">
+              <div class="section-title">Hardware</div>
+              <div class="board-detail-row">
+                <span>PSRAM</span>
+                <strong>{{ formatPsramSize(selectedBoard.psramSizeBytes, selectedBoard.psramDetected) }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Location</span>
+                <strong>{{ selectedBoard.physicalLocation || "Not set" }}</strong>
+              </div>
+            </div>
+
+            <div class="board-info-panel">
+              <div class="section-title">Scan metadata</div>
+              <div class="board-detail-row">
+                <span>Chip revision</span>
+                <strong>{{ selectedBoard.chipRevision ?? "Not set" }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Variant</span>
+                <strong>{{ selectedBoard.chipVariant || "Not set" }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Crystal</span>
+                <strong>{{ selectedBoard.crystalFrequency || "Not set" }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Flash chip</span>
+                <strong>{{ selectedBoard.flashManufacturerName || selectedBoard.flashChipIdHex || "Not set" }}</strong>
+              </div>
+            </div>
+
+            <div class="board-info-panel">
+              <div class="section-title">Security</div>
+              <div class="board-detail-row">
+                <span>Secure boot</span>
+                <strong>{{ formatEnabledState(selectedBoard.secureBootEnabled) }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Flash encryption</span>
+                <strong>{{ formatEnabledState(selectedBoard.flashEncryptionEnabled) }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Security flags</span>
+                <strong>{{ selectedBoard.securityFlagsHex || "Not set" }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Bootloader offset</span>
+                <strong>{{ selectedBoard.bootloaderOffsetHex || "Not set" }}</strong>
+              </div>
+            </div>
+
+            <div class="board-info-panel">
+              <div class="section-title">Record</div>
+              <div class="board-detail-row">
+                <span>Last connected</span>
+                <strong>{{ formatDate(selectedBoard.lastConnectedAt) }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Last scan update</span>
+                <strong>{{ formatDate(selectedBoard.lastScannedAt) }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Updated</span>
+                <strong>{{ formatDate(selectedBoard.updatedAt) }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Created</span>
+                <strong>{{ formatDate(selectedBoard.createdAt) }}</strong>
+              </div>
+              <div class="board-detail-row">
+                <span>Board ID</span>
+                <strong class="metadata-mono">{{ selectedBoard.id }}</strong>
+              </div>
+            </div>
+
+            <div class="board-info-panel board-notes-panel">
+              <div class="section-title">Notes</div>
+              <p class="board-notes-text">
+                {{ selectedBoard.notes || "No notes yet" }}
+              </p>
             </div>
           </div>
         </v-card-text>
