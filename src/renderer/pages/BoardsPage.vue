@@ -808,6 +808,13 @@ function formatBoardType(board: Board): string {
                 <strong class="metadata-mono">{{ selectedBoard.id }}</strong>
               </div>
             </div>
+
+            <div class="board-info-panel board-notes-panel">
+              <div class="section-title">Notes</div>
+              <p class="board-notes-text">
+                {{ selectedBoard.notes || "No notes yet" }}
+              </p>
+            </div>
           </div>
 
           <div class="partitions-panel">
@@ -1245,6 +1252,17 @@ function formatBoardType(board: Board): string {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.board-notes-panel {
+  grid-column: 1 / -1;
+}
+
+.board-notes-text {
+  margin: 10px 0 0;
+  color: var(--vault-text);
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .partitions-panel {
