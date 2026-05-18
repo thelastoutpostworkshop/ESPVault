@@ -145,6 +145,25 @@ html[data-vault-theme="dark"] body {
   border-top: 1px solid var(--vault-border);
 }
 
+.vault-edit-dialog-card {
+  display: flex !important;
+  max-height: calc(100vh - 48px);
+  flex-direction: column;
+}
+
+.vault-edit-dialog-card > .v-card-title,
+.vault-edit-dialog-card > .v-card-actions,
+.vault-edit-dialog-card > .v-divider {
+  flex: 0 0 auto;
+}
+
+.vault-edit-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .page-shell {
   box-sizing: border-box;
   width: 100%;

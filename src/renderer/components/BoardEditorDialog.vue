@@ -416,7 +416,7 @@ function getDroppedImageFile(event: DragEvent): File | null {
     persistent
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <v-card>
+    <v-card class="vault-edit-dialog-card">
       <v-card-title class="d-flex align-center justify-space-between">
         <span>{{ title }}</span>
         <v-btn icon="mdi-close" variant="text" aria-label="Close" @click="close" />
@@ -424,7 +424,7 @@ function getDroppedImageFile(event: DragEvent): File | null {
 
       <v-divider />
 
-      <v-card-text>
+      <v-card-text class="vault-edit-dialog-body">
         <template v-if="isEditing && board">
           <v-alert
             v-if="displayedCoverImageError"

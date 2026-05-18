@@ -1092,13 +1092,13 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
     </div>
 
     <v-dialog v-model="editorOpen" max-width="640" persistent>
-      <v-card>
+      <v-card class="vault-edit-dialog-card">
         <v-card-title class="d-flex align-center justify-space-between">
           <span>{{ editingProject ? "Edit project" : "Add project" }}</span>
           <v-btn icon="mdi-close" variant="text" aria-label="Close" @click="closeEditor" />
         </v-card-title>
         <v-divider />
-        <v-card-text>
+        <v-card-text class="vault-edit-dialog-body">
           <v-form @submit.prevent="saveProject">
             <v-row>
               <v-col cols="12" md="8">
