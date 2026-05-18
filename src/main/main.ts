@@ -41,9 +41,11 @@ const BACKUP_OPEN_CHANNEL = "backup:open";
 const BACKUP_RESTORE_FILES_CHANNEL = "backup:restore-files";
 const SHELL_OPEN_EXTERNAL_CHANNEL = "shell:open-external";
 const BOARD_IMAGE_CHOOSE_COVER_CHANNEL = "board-image:choose-cover";
+const BOARD_IMAGE_COPY_COVER_CHANNEL = "board-image:copy-cover";
 const BOARD_IMAGE_DELETE_COVER_CHANNEL = "board-image:delete-cover";
 const BOARD_IMAGE_READ_COVER_DATA_URL_CHANNEL = "board-image:read-cover-data-url";
 const PROJECT_IMAGE_CHOOSE_COVER_CHANNEL = "project-image:choose-cover";
+const PROJECT_IMAGE_COPY_COVER_CHANNEL = "project-image:copy-cover";
 const PROJECT_IMAGE_DELETE_COVER_CHANNEL = "project-image:delete-cover";
 const PROJECT_IMAGE_READ_COVER_DATA_URL_CHANNEL =
   "project-image:read-cover-data-url";
@@ -97,6 +99,12 @@ interface ZipEntry {
   data: Buffer;
   path: string;
   uncompressedSize: number;
+}
+
+interface CoverImageFilePayload {
+  data: Buffer;
+  filename: string;
+  mimeType: string | null;
 }
 
 app.setName("ESP Board Vault");
@@ -238,6 +246,10 @@ ipcMain.handle(BOARD_IMAGE_CHOOSE_COVER_CHANNEL, async (event, request) => {
 
   return copyBoardCoverImage(boardId, result.filePaths[0]);
 });
+ipcMain.handle(BOARD_IMAGE_COPY_COVER_CHANNEL, (_event, request) => {
+  const { boardId, file } = parseBoardImageCopyRequest(request);
+  return copyBoardCoverImageFile(boardId, file);
+});
 ipcMain.handle(BOARD_IMAGE_DELETE_COVER_CHANNEL, (_event, localPath) => {
   if (typeof localPath !== "string" || !localPath.trim()) {
     return;
@@ -271,6 +283,10 @@ ipcMain.handle(PROJECT_IMAGE_CHOOSE_COVER_CHANNEL, async (event, request) => {
   }
 
   return copyProjectCoverImage(projectId, result.filePaths[0]);
+});
+ipcMain.handle(PROJECT_IMAGE_COPY_COVER_CHANNEL, (_event, request) => {
+  const { projectId, file } = parseProjectImageCopyRequest(request);
+  return copyProjectCoverImageFile(projectId, file);
 });
 ipcMain.handle(PROJECT_IMAGE_DELETE_COVER_CHANNEL, (_event, localPath) => {
   if (typeof localPath !== "string" || !localPath.trim()) {
@@ -1297,6 +1313,15 @@ function parseBoardImageChooseRequest(request: unknown): { boardId: string } {
   return { boardId };
 }
 
+function parseBoardImageCopyRequest(request: unknown): {
+  boardId: string;
+  file: CoverImageFilePayload;
+} {
+  const { boardId } = parseBoardImageChooseRequest(request);
+  const file = parseCoverImageFile(request, "Board");
+  return { boardId, file };
+}
+
 function parseProjectImageChooseRequest(request: unknown): { projectId: string } {
   if (
     typeof request !== "object" ||
@@ -1313,6 +1338,67 @@ function parseProjectImageChooseRequest(request: unknown): { projectId: string }
   }
 
   return { projectId };
+}
+
+function parseProjectImageCopyRequest(request: unknown): {
+  projectId: string;
+  file: CoverImageFilePayload;
+} {
+  const { projectId } = parseProjectImageChooseRequest(request);
+  const file = parseCoverImageFile(request, "Project");
+  return { projectId, file };
+}
+
+function parseCoverImageFile(
+  request: unknown,
+  label: string
+): CoverImageFilePayload {
+  if (
+    typeof request !== "object" ||
+    request === null ||
+    Array.isArray(request)
+  ) {
+    throw new Error(`${label} photo request is invalid.`);
+  }
+
+  const { file } = request as Record<string, unknown>;
+
+  if (typeof file !== "object" || file === null || Array.isArray(file)) {
+    throw new Error(`${label} photo request is missing an image file.`);
+  }
+
+  const { data, filename, mimeType } = file as Record<string, unknown>;
+
+  if (typeof filename !== "string" || !filename.trim()) {
+    throw new Error(`${label} photo request is missing a file name.`);
+  }
+
+  const buffer = toBuffer(data);
+  if (!buffer.length) {
+    throw new Error(`${label} photo file is empty.`);
+  }
+
+  return {
+    data: buffer,
+    filename: path.basename(filename),
+    mimeType: typeof mimeType === "string" && mimeType.trim() ? mimeType : null
+  };
+}
+
+function toBuffer(value: unknown): Buffer {
+  if (Buffer.isBuffer(value)) {
+    return value;
+  }
+
+  if (value instanceof ArrayBuffer) {
+    return Buffer.from(value);
+  }
+
+  if (ArrayBuffer.isView(value)) {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  }
+
+  throw new Error("Photo file content is invalid.");
 }
 
 function copyBoardCoverImage(
@@ -1334,6 +1420,25 @@ function copyBoardCoverImage(
   );
 }
 
+function copyBoardCoverImageFile(
+  boardId: string,
+  file: CoverImageFilePayload
+): {
+  canceled: false;
+  dataUrl: string | null;
+  filename: string;
+  localPath: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+} {
+  return copyCoverImageFile(
+    boardId,
+    file,
+    getBoardCoverImageDirectory,
+    readBoardCoverImageDataUrl
+  );
+}
+
 function copyProjectCoverImage(
   projectId: string,
   sourcePath: string
@@ -1348,6 +1453,25 @@ function copyProjectCoverImage(
   return copyCoverImage(
     projectId,
     sourcePath,
+    getProjectCoverImageDirectory,
+    readCoverImageDataUrl
+  );
+}
+
+function copyProjectCoverImageFile(
+  projectId: string,
+  file: CoverImageFilePayload
+): {
+  canceled: false;
+  dataUrl: string | null;
+  filename: string;
+  localPath: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+} {
+  return copyCoverImageFile(
+    projectId,
+    file,
     getProjectCoverImageDirectory,
     readCoverImageDataUrl
   );
@@ -1387,6 +1511,45 @@ function copyCoverImage(
     canceled: false,
     dataUrl: readDataUrl(targetPath),
     filename: path.basename(resolvedSourcePath),
+    localPath: targetPath,
+    mimeType,
+    sizeBytes: stats.size
+  };
+}
+
+function copyCoverImageFile(
+  ownerId: string,
+  file: CoverImageFilePayload,
+  getTargetDirectory: (ownerId: string) => string,
+  readDataUrl: (localPath: string) => string | null
+): {
+  canceled: false;
+  dataUrl: string | null;
+  filename: string;
+  localPath: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+} {
+  const extension = getSupportedImageExtension(file.filename);
+
+  if (!extension) {
+    throw new Error("Choose a JPG, PNG, WebP, GIF, or BMP image.");
+  }
+
+  const targetDirectory = getTargetDirectory(ownerId);
+  const targetFilename = `cover-${Date.now()}-${randomUUID()}${extension}`;
+  const targetPath = path.join(targetDirectory, targetFilename);
+
+  mkdirSync(targetDirectory, { recursive: true });
+  writeFileSync(targetPath, file.data);
+
+  const stats = statSync(targetPath);
+  const mimeType = getImageMimeType(targetPath) ?? file.mimeType;
+
+  return {
+    canceled: false,
+    dataUrl: readDataUrl(targetPath),
+    filename: file.filename,
     localPath: targetPath,
     mimeType,
     sizeBytes: stats.size

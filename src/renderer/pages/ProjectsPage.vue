@@ -2,6 +2,10 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import type { Board } from "../../shared/types/board";
+import type {
+  CoverImageFileInput,
+  CoverImageResult
+} from "../../shared/types/api";
 import {
   PROJECT_STATUSES,
   type CreateProjectInput,
@@ -77,6 +81,7 @@ const coverImageDataUrl = ref<string | null>(null);
 const coverImageError = ref<string | null>(null);
 const coverImageLoading = ref(false);
 const coverImageViewerOpen = ref(false);
+const coverImageDragActive = ref(false);
 const coverThumbnailUrls = ref<Record<string, string | null>>({});
 let coverImageLoadToken = 0;
 let coverThumbnailLoadToken = 0;
@@ -388,6 +393,32 @@ async function chooseCoverImage(): Promise<void> {
     return;
   }
 
+  await applyProjectCoverImage(project, () =>
+    window.api.projectImages.chooseCover(project.id)
+  );
+}
+
+async function dropCoverImage(file: File): Promise<void> {
+  const project = selectedRow.value?.project;
+  if (!project) {
+    return;
+  }
+
+  await applyProjectCoverImage(project, () =>
+    readCoverImageFile(file).then((coverFile) =>
+      window.api.projectImages.copyCoverFromFile(project.id, coverFile)
+    )
+  );
+}
+
+async function applyProjectCoverImage(
+  project: Project,
+  copyCoverImage: () => Promise<CoverImageResult>
+): Promise<void> {
+  if (coverImageLoading.value) {
+    return;
+  }
+
   coverImageError.value = null;
   coverImageLoading.value = true;
 
@@ -395,7 +426,7 @@ async function chooseCoverImage(): Promise<void> {
   let copiedPath: string | null = null;
 
   try {
-    const result = await window.api.projectImages.chooseCover(project.id);
+    const result = await copyCoverImage();
 
     if (result.canceled || !result.localPath) {
       return;
@@ -431,6 +462,34 @@ async function chooseCoverImage(): Promise<void> {
   } finally {
     coverImageLoading.value = false;
   }
+}
+
+function handleCoverDrag(event: DragEvent): void {
+  if (!selectedRow.value || coverImageLoading.value) {
+    return;
+  }
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  coverImageDragActive.value = true;
+}
+
+function clearCoverDrag(): void {
+  coverImageDragActive.value = false;
+}
+
+async function dropCoverImageFromEvent(event: DragEvent): Promise<void> {
+  coverImageDragActive.value = false;
+  const file = getDroppedImageFile(event);
+
+  if (!file) {
+    coverImageError.value = "Drop a JPG, PNG, WebP, GIF, or BMP image.";
+    return;
+  }
+
+  await dropCoverImage(file);
 }
 
 async function removeCoverImage(): Promise<void> {
@@ -525,6 +584,23 @@ function getProjectImageError(
   fallbackMessage: string
 ): string {
   return caughtError instanceof Error ? caughtError.message : fallbackMessage;
+}
+
+function getDroppedImageFile(event: DragEvent): File | null {
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  return (
+    files.find((file) =>
+      file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name)
+    ) ?? null
+  );
+}
+
+async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
+  return {
+    data: await file.arrayBuffer(),
+    filename: file.name,
+    mimeType: file.type || null
+  };
 }
 </script>
 
@@ -758,7 +834,14 @@ function getProjectImageError(
             {{ coverImageError }}
           </v-alert>
 
-          <div class="project-cover-panel">
+          <div
+            class="project-cover-panel cover-drop-target"
+            :class="{ 'cover-drop-target--active': coverImageDragActive }"
+            @dragenter.prevent="handleCoverDrag"
+            @dragover.prevent="handleCoverDrag"
+            @dragleave.prevent="clearCoverDrag"
+            @drop.prevent.stop="dropCoverImageFromEvent"
+          >
             <div class="project-cover-preview">
               <button
                 v-if="coverImageDataUrl"
@@ -810,6 +893,9 @@ function getProjectImageError(
                 >
                   Remove
                 </v-btn>
+              </div>
+              <div class="text-caption muted mt-2">
+                Drag an image here to update the project photo.
               </div>
             </div>
           </div>
@@ -1107,11 +1193,26 @@ function getProjectImageError(
 }
 
 .project-cover-panel {
+  position: relative;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
   margin-bottom: 18px;
+  border-radius: 8px;
+}
+
+.cover-drop-target {
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+  transition:
+    background-color 140ms ease,
+    outline-color 140ms ease;
+}
+
+.cover-drop-target--active {
+  background: rgba(var(--v-theme-primary), 0.08);
+  outline-color: rgba(var(--v-theme-primary), 0.72);
 }
 
 .project-cover-preview {

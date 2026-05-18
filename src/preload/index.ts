@@ -67,6 +67,18 @@ const api: EspBoardVaultApi = {
         mimeType?: string | null;
         sizeBytes?: number | null;
       }>,
+    copyCoverFromFile: (boardId, file) =>
+      ipcRenderer.invoke("board-image:copy-cover", {
+        boardId,
+        file
+      }) as Promise<{
+        canceled: boolean;
+        dataUrl?: string | null;
+        filename?: string;
+        localPath?: string;
+        mimeType?: string | null;
+        sizeBytes?: number | null;
+      }>,
     deleteCover: (localPath) =>
       ipcRenderer.invoke("board-image:delete-cover", localPath) as Promise<void>,
     readCoverDataUrl: (localPath) =>
@@ -79,6 +91,18 @@ const api: EspBoardVaultApi = {
     chooseCover: (projectId) =>
       ipcRenderer.invoke("project-image:choose-cover", {
         projectId
+      }) as Promise<{
+        canceled: boolean;
+        dataUrl?: string | null;
+        filename?: string;
+        localPath?: string;
+        mimeType?: string | null;
+        sizeBytes?: number | null;
+      }>,
+    copyCoverFromFile: (projectId, file) =>
+      ipcRenderer.invoke("project-image:copy-cover", {
+        projectId,
+        file
       }) as Promise<{
         canceled: boolean;
         dataUrl?: string | null;

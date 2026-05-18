@@ -7,6 +7,10 @@ import {
   type BoardStatus,
   type CreateBoardInput
 } from "../../shared/types/board";
+import type {
+  CoverImageFileInput,
+  CoverImageResult
+} from "../../shared/types/api";
 import BoardEditorDialog from "../components/BoardEditorDialog.vue";
 import { useBoardStore } from "../stores/boardStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -52,6 +56,7 @@ const openedBoardId = ref<string | null>(null);
 const selectedBoardId = ref<string | null>(null);
 const boardCoverError = ref<string | null>(null);
 const boardCoverBusyId = ref<string | null>(null);
+const boardCoverDragActiveId = ref<string | null>(null);
 const boardThumbnailUrls = ref<Record<string, string | null>>({});
 let boardThumbnailLoadToken = 0;
 
@@ -257,6 +262,25 @@ async function loadBoardCoverThumbnails(boardList: Board[]): Promise<void> {
 }
 
 async function chooseBoardCover(board: Board): Promise<void> {
+  await applyBoardCoverImage(board, () => window.api.boardImages.chooseCover(board.id));
+}
+
+async function dropBoardCover(board: Board, file: File): Promise<void> {
+  await applyBoardCoverImage(board, () =>
+    readCoverImageFile(file).then((coverFile) =>
+      window.api.boardImages.copyCoverFromFile(board.id, coverFile)
+    )
+  );
+}
+
+async function applyBoardCoverImage(
+  board: Board,
+  copyCoverImage: () => Promise<CoverImageResult>
+): Promise<void> {
+  if (boardCoverBusyId.value) {
+    return;
+  }
+
   boardCoverError.value = null;
   boardCoverBusyId.value = board.id;
 
@@ -264,7 +288,7 @@ async function chooseBoardCover(board: Board): Promise<void> {
   let copiedPath: string | null = null;
 
   try {
-    const result = await window.api.boardImages.chooseCover(board.id);
+    const result = await copyCoverImage();
 
     if (result.canceled || !result.localPath) {
       return;
@@ -306,6 +330,42 @@ async function chooseBoardCover(board: Board): Promise<void> {
   } finally {
     boardCoverBusyId.value = null;
   }
+}
+
+function handleBoardCoverDrag(
+  board: Board,
+  event: DragEvent
+): void {
+  if (boardCoverBusyId.value === board.id) {
+    return;
+  }
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  boardCoverDragActiveId.value = board.id;
+}
+
+function clearBoardCoverDrag(board: Board): void {
+  if (boardCoverDragActiveId.value === board.id) {
+    boardCoverDragActiveId.value = null;
+  }
+}
+
+async function dropBoardCoverFromEvent(
+  board: Board,
+  event: DragEvent
+): Promise<void> {
+  clearBoardCoverDrag(board);
+  const file = getDroppedImageFile(event);
+
+  if (!file) {
+    boardCoverError.value = "Drop a JPG, PNG, WebP, GIF, or BMP image.";
+    return;
+  }
+
+  await dropBoardCover(board, file);
 }
 
 async function removeBoardCover(board: Board): Promise<void> {
@@ -352,6 +412,23 @@ async function removeBoardCover(board: Board): Promise<void> {
 
 function getBoardCoverError(caughtError: unknown, fallback: string): string {
   return caughtError instanceof Error ? caughtError.message : fallback;
+}
+
+function getDroppedImageFile(event: DragEvent): File | null {
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  return (
+    files.find((file) =>
+      file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name)
+    ) ?? null
+  );
+}
+
+async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
+  return {
+    data: await file.arrayBuffer(),
+    filename: file.name,
+    mimeType: file.type || null
+  };
 }
 
 function formatProjectName(board: Board): string {
@@ -553,7 +630,17 @@ function formatBoardType(board: Board): string {
         </v-card-title>
         <v-divider />
         <v-card-text>
-          <div class="board-cover-panel">
+          <div
+            class="board-cover-panel cover-drop-target"
+            :class="{
+              'cover-drop-target--active':
+                boardCoverDragActiveId === selectedBoard.id
+            }"
+            @dragenter.prevent="handleBoardCoverDrag(selectedBoard, $event)"
+            @dragover.prevent="handleBoardCoverDrag(selectedBoard, $event)"
+            @dragleave.prevent="clearBoardCoverDrag(selectedBoard)"
+            @drop.prevent.stop="dropBoardCoverFromEvent(selectedBoard, $event)"
+          >
             <div class="board-cover-preview">
               <v-img
                 v-if="boardThumbnailUrls[selectedBoard.id]"
@@ -604,6 +691,9 @@ function formatBoardType(board: Board): string {
                 >
                   Remove
                 </v-btn>
+              </div>
+              <div class="text-caption muted mt-2">
+                Drag an image here to update the board photo.
               </div>
             </div>
           </div>
@@ -845,6 +935,7 @@ function formatBoardType(board: Board): string {
       :cover-image-error="boardCoverError"
       @choose-cover="chooseBoardCover"
       @remove-cover="removeBoardCover"
+      @drop-cover="dropBoardCover"
       @save="saveBoard"
     />
 
@@ -974,11 +1065,26 @@ function formatBoardType(board: Board): string {
 }
 
 .board-cover-panel {
+  position: relative;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
   margin-bottom: 18px;
+  border-radius: 8px;
+}
+
+.cover-drop-target {
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+  transition:
+    background-color 140ms ease,
+    outline-color 140ms ease;
+}
+
+.cover-drop-target--active {
+  background: rgba(var(--v-theme-primary), 0.08);
+  outline-color: rgba(var(--v-theme-primary), 0.72);
 }
 
 .board-cover-preview {

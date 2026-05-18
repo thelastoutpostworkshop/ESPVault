@@ -17,11 +17,19 @@ export interface EspBoardVaultApi {
   };
   boardImages: {
     chooseCover(boardId: string): Promise<CoverImageResult>;
+    copyCoverFromFile(
+      boardId: string,
+      file: CoverImageFileInput
+    ): Promise<CoverImageResult>;
     deleteCover(localPath: string): Promise<void>;
     readCoverDataUrl(localPath: string): Promise<string | null>;
   };
   projectImages: {
     chooseCover(projectId: string): Promise<CoverImageResult>;
+    copyCoverFromFile(
+      projectId: string,
+      file: CoverImageFileInput
+    ): Promise<CoverImageResult>;
     deleteCover(localPath: string): Promise<void>;
     readCoverDataUrl(localPath: string): Promise<string | null>;
   };
@@ -84,4 +92,10 @@ export interface CoverImageResult {
   localPath?: string;
   mimeType?: string | null;
   sizeBytes?: number | null;
+}
+
+export interface CoverImageFileInput {
+  data: ArrayBuffer;
+  filename: string;
+  mimeType?: string | null;
 }

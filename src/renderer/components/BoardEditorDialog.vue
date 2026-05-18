@@ -68,6 +68,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   "update:modelValue": [value: boolean];
   "choose-cover": [board: Board];
+  "drop-cover": [board: Board, file: File];
   "remove-cover": [board: Board];
   save: [input: CreateBoardInput];
 }>();
@@ -77,6 +78,7 @@ const coverImageDataUrl = ref<string | null>(null);
 const coverImageLoading = ref(false);
 const coverImageLoadError = ref<string | null>(null);
 const coverImageViewerOpen = ref(false);
+const coverImageDragActive = ref(false);
 const projectStore = useProjectStore();
 const { projects } = storeToRefs(projectStore);
 const isEditing = computed(() => Boolean(props.board));
@@ -274,6 +276,38 @@ function chooseCoverImage(): void {
   }
 }
 
+function handleCoverDrag(event: DragEvent): void {
+  if (!props.board || coverImageActionBusy.value) {
+    return;
+  }
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  coverImageDragActive.value = true;
+}
+
+function clearCoverDrag(): void {
+  coverImageDragActive.value = false;
+}
+
+function dropCoverImage(event: DragEvent): void {
+  coverImageDragActive.value = false;
+
+  if (!props.board || coverImageActionBusy.value) {
+    return;
+  }
+
+  const file = getDroppedImageFile(event);
+  if (!file) {
+    coverImageLoadError.value = "Drop a JPG, PNG, WebP, GIF, or BMP image.";
+    return;
+  }
+
+  emit("drop-cover", props.board, file);
+}
+
 function removeCoverImage(): void {
   if (props.board) {
     emit("remove-cover", props.board);
@@ -362,6 +396,15 @@ function formatNumberArray(value: number[] | null): string {
 function getCoverImageError(caughtError: unknown, fallback: string): string {
   return caughtError instanceof Error ? caughtError.message : fallback;
 }
+
+function getDroppedImageFile(event: DragEvent): File | null {
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  return (
+    files.find((file) =>
+      file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name)
+    ) ?? null
+  );
+}
 </script>
 
 <template>
@@ -391,7 +434,14 @@ function getCoverImageError(caughtError: unknown, fallback: string): string {
             {{ displayedCoverImageError }}
           </v-alert>
 
-          <div class="board-cover-panel">
+          <div
+            class="board-cover-panel cover-drop-target"
+            :class="{ 'cover-drop-target--active': coverImageDragActive }"
+            @dragenter.prevent="handleCoverDrag"
+            @dragover.prevent="handleCoverDrag"
+            @dragleave.prevent="clearCoverDrag"
+            @drop.prevent.stop="dropCoverImage"
+          >
             <div class="board-cover-preview">
               <button
                 v-if="coverImageDataUrl"
@@ -443,6 +493,9 @@ function getCoverImageError(caughtError: unknown, fallback: string): string {
                 >
                   Remove
                 </v-btn>
+              </div>
+              <div class="text-caption muted mt-2">
+                Drag an image here to update the board photo.
               </div>
             </div>
           </div>
@@ -763,11 +816,26 @@ function getCoverImageError(caughtError: unknown, fallback: string): string {
 }
 
 .board-cover-panel {
+  position: relative;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
   margin-bottom: 18px;
+  border-radius: 8px;
+}
+
+.cover-drop-target {
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+  transition:
+    background-color 140ms ease,
+    outline-color 140ms ease;
+}
+
+.cover-drop-target--active {
+  background: rgba(var(--v-theme-primary), 0.08);
+  outline-color: rgba(var(--v-theme-primary), 0.72);
 }
 
 .board-cover-preview {
