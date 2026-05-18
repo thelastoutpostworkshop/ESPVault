@@ -36,6 +36,7 @@ interface ProjectFilters {
 interface ProjectForm {
   name: string;
   description: string;
+  location: string;
   status: ProjectStatus;
 }
 
@@ -124,7 +125,7 @@ const filteredRows = computed(() => {
   return projectRows.value.filter(({ project }) => {
     const matchesSearch =
       !search ||
-      [project.name, project.description]
+      [project.name, project.description, project.location]
         .filter((value): value is string => Boolean(value))
         .some((value) => value.toLowerCase().includes(search));
     const matchesStatus =
@@ -227,6 +228,7 @@ function emptyForm(): ProjectForm {
   return {
     name: "",
     description: "",
+    location: "",
     status: "active"
   };
 }
@@ -242,6 +244,7 @@ function openEditDialog(project: Project): void {
   Object.assign(form, {
     name: project.name,
     description: project.description ?? "",
+    location: project.location ?? "",
     status: project.status
   });
   editorOpen.value = true;
@@ -277,6 +280,7 @@ async function saveProject(): Promise<void> {
   const input: CreateProjectInput = {
     name: form.name,
     description: form.description,
+    location: form.location,
     status: form.status
   };
 
@@ -755,7 +759,7 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
                   <div class="project-list-copy">
                     <div class="board-name">{{ row.project.name }}</div>
                     <div class="text-caption muted">
-                      {{ row.project.description || "No notes yet" }}
+                      {{ row.project.location || row.project.description || "No location set" }}
                     </div>
                   </div>
                 </div>
@@ -793,6 +797,13 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
             <div class="text-h6">{{ selectedRow.project.name }}</div>
             <div class="text-body-2 muted">
               {{ selectedRow.project.description || "No notes yet" }}
+            </div>
+            <div
+              v-if="selectedRow.project.location"
+              class="project-location-line"
+            >
+              <v-icon icon="mdi-map-marker-outline" size="16" />
+              <span>{{ selectedRow.project.location }}</span>
             </div>
           </div>
           <div class="project-detail-actions">
@@ -907,6 +918,12 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
             <div>
               <div class="metric-label">Health</div>
               <div class="project-fact-value">{{ formatProjectHealth(selectedRow) }}</div>
+            </div>
+            <div>
+              <div class="metric-label">Location</div>
+              <div class="project-fact-value">
+                {{ selectedRow.project.location || "Not set" }}
+              </div>
             </div>
             <div>
               <div class="metric-label">Updated</div>
@@ -1039,6 +1056,13 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
                     value: status
                   }))"
                   label="Status"
+                />
+              </v-col>
+              <v-col cols="12">
+                <v-text-field
+                  v-model="form.location"
+                  label="Project location"
+                  prepend-inner-icon="mdi-map-marker-outline"
                 />
               </v-col>
               <v-col cols="12">
@@ -1191,6 +1215,15 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
   gap: 6px;
 }
 
+.project-location-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--vault-muted);
+  font-size: 0.88rem;
+}
+
 .project-cover-panel {
   position: relative;
   display: grid;
@@ -1297,7 +1330,7 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
 
 .project-facts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 

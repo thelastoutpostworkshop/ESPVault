@@ -42,6 +42,17 @@ export class VaultDatabase extends Dexie {
       pinAssignments: "id, boardId, gpio, updatedAt, createdAt",
       appSettings: "key, updatedAt"
     });
+
+    this.version(3).stores({
+      boards:
+        "id, name, status, chipModel, chipFamily, flashChipId, flashManufacturerId, projectId, updatedAt, lastConnectedAt, createdAt",
+      projects: "id, name, status, location, updatedAt, createdAt",
+      boardTags: "id, boardId, tag, createdAt",
+      firmwareHistory: "id, boardId, firmwareName, flashedAt, createdAt",
+      attachments: "id, boardId, type, filename, createdAt",
+      pinAssignments: "id, boardId, gpio, updatedAt, createdAt",
+      appSettings: "key, updatedAt"
+    });
   }
 }
 

@@ -34,6 +34,7 @@ export class DexieProjectRepository implements ProjectRepository {
       id: crypto.randomUUID(),
       name: this.requireName(input.name),
       description: this.optionalText(input.description),
+      location: this.optionalText(input.location),
       status: input.status ?? "active",
       coverImagePath: this.optionalText(input.coverImagePath),
       coverImageFilename: this.optionalText(input.coverImageFilename),
@@ -65,6 +66,10 @@ export class DexieProjectRepository implements ProjectRepository {
         input.description === undefined
           ? existing.description
           : this.optionalText(input.description),
+      location:
+        input.location === undefined
+          ? existing.location
+          : this.optionalText(input.location),
       status: input.status ?? existing.status,
       coverImagePath:
         input.coverImagePath === undefined
@@ -129,7 +134,7 @@ export class DexieProjectRepository implements ProjectRepository {
     const search = filters.search?.trim().toLowerCase();
     const matchesSearch =
       !search ||
-      [project.name, project.description]
+      [project.name, project.description, project.location]
         .filter((value): value is string => Boolean(value))
         .some((value) => value.toLowerCase().includes(search));
     const matchesStatus =
@@ -148,6 +153,7 @@ export class DexieProjectRepository implements ProjectRepository {
     return {
       ...project,
       description: project.description ?? null,
+      location: project.location ?? null,
       status,
       coverImagePath: project.coverImagePath ?? null,
       coverImageFilename: project.coverImageFilename ?? null,

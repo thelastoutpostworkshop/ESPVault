@@ -11,6 +11,7 @@ export interface Project {
   id: string;
   name: string;
   description: string | null;
+  location: string | null;
   status: ProjectStatus;
   coverImagePath: string | null;
   coverImageFilename: string | null;
@@ -23,6 +24,7 @@ export interface Project {
 export interface CreateProjectInput {
   name: string;
   description?: string | null;
+  location?: string | null;
   status?: ProjectStatus;
   coverImagePath?: string | null;
   coverImageFilename?: string | null;
