@@ -1264,6 +1264,7 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
 
 .board-cover-preview {
   position: relative;
+  display: grid;
   min-height: 180px;
   overflow: hidden;
   border: 1px solid var(--vault-border);
@@ -1274,9 +1275,11 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
 }
 
 .board-cover-viewer-trigger {
-  display: block;
+  display: grid;
   width: 100%;
+  height: 100%;
   min-height: 180px;
+  place-items: center;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1286,6 +1289,16 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
 .board-cover-viewer-trigger:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary));
   outline-offset: -3px;
+}
+
+.board-cover-viewer-trigger :deep(.v-img) {
+  width: 100%;
+  height: 100% !important;
+}
+
+.board-cover-viewer-trigger :deep(.v-img__img) {
+  object-fit: contain;
+  object-position: center center;
 }
 
 .board-cover-placeholder {
