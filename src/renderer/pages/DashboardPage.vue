@@ -793,55 +793,6 @@ function getCssVariable(name: string, fallback: string): string {
       </div>
     </div>
 
-    <div class="dashboard-snapshot">
-      <div class="snapshot-panel">
-        <div class="metric-label">Known memory</div>
-        <div class="snapshot-values">
-          <div class="memory-row">
-            <div>
-              <strong>{{ formatBytes(totalFlashBytes) }}</strong>
-              <span class="memory-type">Flash memory</span>
-            </div>
-            <span>{{ formatRecordedCount(boardsWithKnownFlash) }}</span>
-          </div>
-          <div class="memory-row">
-            <div>
-              <strong>{{ formatBytes(totalPsramBytes) }}</strong>
-              <span class="memory-type">PSRAM memory</span>
-            </div>
-            <span>{{ formatRecordedCount(boardsWithKnownPsram) }}</span>
-          </div>
-        </div>
-      </div>
-      <div class="snapshot-panel">
-        <div class="metric-label">Board state</div>
-        <div class="status-pills">
-          <v-chip color="success" prepend-icon="mdi-check-circle-outline" size="small" variant="tonal">
-            {{ availableBoards }} available
-          </v-chip>
-          <v-chip color="info" prepend-icon="mdi-play-circle-outline" size="small" variant="tonal">
-            {{ inUseBoards }} in use
-          </v-chip>
-          <v-chip color="error" prepend-icon="mdi-alert-octagon-outline" size="small" variant="tonal">
-            {{ brokenBoards }} broken
-          </v-chip>
-        </div>
-      </div>
-      <div class="snapshot-panel">
-        <div class="metric-label">Lab organization</div>
-        <div class="snapshot-values">
-          <div>
-            <strong>{{ unassignedBoards }}</strong>
-            <span>Unassigned board{{ unassignedBoards === 1 ? "" : "s" }}</span>
-          </div>
-          <div>
-            <strong>{{ dominantChipFamily }}</strong>
-            <span>Dominant chip family</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="dashboard-main-grid">
       <v-card class="panel-card dashboard-panel chip-family-panel" flat>
           <v-card-title class="text-subtitle-1 font-weight-bold chip-family-title">
@@ -1091,6 +1042,55 @@ function getCssVariable(name: string, fallback: string): string {
           </div>
         </div>
       </v-card>
+    </div>
+
+    <div class="dashboard-snapshot">
+      <div class="snapshot-panel">
+        <div class="metric-label">Known memory</div>
+        <div class="snapshot-values">
+          <div class="memory-row">
+            <div>
+              <strong>{{ formatBytes(totalFlashBytes) }}</strong>
+              <span class="memory-type">Flash memory</span>
+            </div>
+            <span>{{ formatRecordedCount(boardsWithKnownFlash) }}</span>
+          </div>
+          <div class="memory-row">
+            <div>
+              <strong>{{ formatBytes(totalPsramBytes) }}</strong>
+              <span class="memory-type">PSRAM memory</span>
+            </div>
+            <span>{{ formatRecordedCount(boardsWithKnownPsram) }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="snapshot-panel">
+        <div class="metric-label">Board state</div>
+        <div class="status-pills">
+          <v-chip color="success" prepend-icon="mdi-check-circle-outline" size="small" variant="tonal">
+            {{ availableBoards }} available
+          </v-chip>
+          <v-chip color="info" prepend-icon="mdi-play-circle-outline" size="small" variant="tonal">
+            {{ inUseBoards }} in use
+          </v-chip>
+          <v-chip color="error" prepend-icon="mdi-alert-octagon-outline" size="small" variant="tonal">
+            {{ brokenBoards }} broken
+          </v-chip>
+        </div>
+      </div>
+      <div class="snapshot-panel">
+        <div class="metric-label">Lab organization</div>
+        <div class="snapshot-values">
+          <div>
+            <strong>{{ unassignedBoards }}</strong>
+            <span>Unassigned board{{ unassignedBoards === 1 ? "" : "s" }}</span>
+          </div>
+          <div>
+            <strong>{{ dominantChipFamily }}</strong>
+            <span>Dominant chip family</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <v-card class="panel-card dashboard-panel recent-activity-panel" flat>
