@@ -763,7 +763,7 @@ function formatEnabledState(value: boolean | null): string {
                   variant="tonal"
                   @click="openPartitionBuilder(selectedBoard)"
                 >
-                  change the partitions
+                  Modify the partitions
                 </v-btn>
               </div>
             </div>
