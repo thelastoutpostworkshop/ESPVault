@@ -799,14 +799,16 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
                     />
                   </div>
                   <div class="project-list-copy">
-                    <div class="board-name">{{ row.project.name }}</div>
-                    <div class="text-caption muted">
+                    <div class="board-name project-list-name">
+                      {{ row.project.name }}
+                    </div>
+                    <div class="text-caption muted project-list-meta">
                       {{ row.project.location || row.project.description || "No location set" }}
                     </div>
                   </div>
                 </div>
               </td>
-              <td>
+              <td class="project-list-status-cell">
                 <v-chip
                   class="status-chip"
                   :color="PROJECT_STATUS_COLORS[row.project.status]"
@@ -817,8 +819,13 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
                   {{ PROJECT_STATUS_LABELS[row.project.status] }}
                 </v-chip>
               </td>
-              <td>{{ row.assignedBoards.length }}</td>
-              <td>
+              <td class="project-list-board-count">
+                <span>{{ row.assignedBoards.length }}</span>
+                <span class="project-list-board-count-label">
+                  {{ row.assignedBoards.length === 1 ? " board" : " boards" }}
+                </span>
+              </td>
+              <td class="project-list-health-cell">
                 <v-chip
                   :color="projectHealthColor(row)"
                   :prepend-icon="projectHealthIcon(row)"
@@ -1224,6 +1231,31 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
   vertical-align: top;
 }
 
+.projects-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.projects-table :deep(th:nth-child(1)),
+.projects-table :deep(td:nth-child(1)) {
+  width: 46%;
+}
+
+.projects-table :deep(th:nth-child(2)),
+.projects-table :deep(td:nth-child(2)) {
+  width: 24%;
+}
+
+.projects-table :deep(th:nth-child(3)),
+.projects-table :deep(td:nth-child(3)) {
+  width: 12%;
+}
+
+.projects-table :deep(th:nth-child(4)),
+.projects-table :deep(td:nth-child(4)) {
+  width: 18%;
+}
+
 .project-row {
   cursor: pointer;
 }
@@ -1263,6 +1295,21 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
 
 .project-list-copy {
   min-width: 0;
+}
+
+.project-list-name,
+.project-list-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-list-board-count {
+  font-weight: 700;
+}
+
+.project-list-board-count-label {
+  display: none;
 }
 
 .project-detail-title {
@@ -1496,6 +1543,83 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
 @media (max-width: 1200px) {
   .projects-layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1500px) {
+  .projects-table :deep(thead) {
+    display: none;
+  }
+
+  .projects-table :deep(tbody) {
+    display: block;
+  }
+
+  .projects-table :deep(tr) {
+    display: grid;
+    grid-template-columns: max-content max-content max-content;
+    gap: 10px 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--vault-soft-border);
+  }
+
+  .projects-table :deep(td),
+  .projects-table :deep(th),
+  .projects-table :deep(td:nth-child(1)),
+  .projects-table :deep(td:nth-child(2)),
+  .projects-table :deep(td:nth-child(3)),
+  .projects-table :deep(td:nth-child(4)) {
+    width: auto;
+    padding: 0;
+    border-bottom: 0 !important;
+  }
+
+  .projects-table :deep(td:first-child) {
+    grid-column: 1 / -1;
+  }
+
+  .project-list-identity {
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .project-list-cover {
+    width: 64px;
+    height: 64px;
+  }
+
+  .project-list-name {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.2;
+  }
+
+  .project-list-meta {
+    margin-top: 4px;
+  }
+
+  .project-list-board-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border: 1px solid var(--vault-soft-border);
+    border-radius: 999px;
+    padding: 0 10px;
+    background: rgba(var(--v-theme-surface-variant), 0.34);
+    color: var(--vault-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .project-list-board-count-label {
+    display: inline;
+  }
+
+  .project-row--selected {
+    box-shadow: inset 4px 0 0 rgb(var(--v-theme-primary));
   }
 }
 
