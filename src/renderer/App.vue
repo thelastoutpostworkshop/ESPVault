@@ -55,6 +55,7 @@ const projectToOpenId = ref<string | null>(null);
 const scanRequestId = ref(0);
 const searchSelection = ref<SearchItem | null>(null);
 const searchQuery = ref("");
+const appVersion = ref<string | null>(null);
 const { isDarkTheme, toggleTheme } = useVaultTheme();
 const boardStore = useBoardStore();
 const projectStore = useProjectStore();
@@ -171,6 +172,7 @@ const activeComponentProps = computed(() => {
 
 onMounted(() => {
   void refreshAppData();
+  void loadAppVersion();
 });
 
 function openBoards(): void {
@@ -221,6 +223,14 @@ function selectSearchResult(item: SearchItem | null): void {
 
 async function refreshAppData(): Promise<void> {
   await Promise.all([boardStore.refresh(), projectStore.loadProjects()]);
+}
+
+async function loadAppVersion(): Promise<void> {
+  try {
+    appVersion.value = await window.api.app.getVersion();
+  } catch {
+    appVersion.value = null;
+  }
 }
 
 function formatBoardSearchSubtitle(board: Board): string {
@@ -301,6 +311,11 @@ function openResource(item: ResourceItem): void {
           @click="openResource(item)"
         />
       </v-list>
+
+      <div class="nav-version-block">
+        <span>ESP Board Vault</span>
+        <strong>Version {{ appVersion ?? "unknown" }}</strong>
+      </div>
     </v-navigation-drawer>
 
     <v-app-bar class="vault-app-bar" flat color="surface">
@@ -396,6 +411,11 @@ function openResource(item: ResourceItem): void {
     rgb(var(--v-theme-surface));
 }
 
+.vault-drawer :deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+}
+
 .brand-block {
   display: grid;
   min-height: 86px;
@@ -419,6 +439,29 @@ function openResource(item: ResourceItem): void {
   border: 1px solid rgba(var(--v-theme-primary), 0.24);
   background: rgba(var(--v-theme-primary), 0.12);
   color: rgb(var(--v-theme-primary));
+}
+
+.nav-version-block {
+  display: grid;
+  gap: 4px;
+  margin: auto 16px 18px;
+  border: 1px solid var(--vault-soft-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(var(--v-theme-surface-variant), 0.28);
+}
+
+.nav-version-block span {
+  color: var(--vault-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.nav-version-block strong {
+  color: var(--vault-text);
+  font-size: 0.88rem;
+  font-weight: 800;
 }
 
 .vault-app-bar {

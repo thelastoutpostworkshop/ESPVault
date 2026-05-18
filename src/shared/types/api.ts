@@ -1,4 +1,7 @@
 export interface EspBoardVaultApi {
+  app: {
+    getVersion(): Promise<string>;
+  };
   backup: {
     open(): Promise<BackupOpenResult>;
     restoreFiles(

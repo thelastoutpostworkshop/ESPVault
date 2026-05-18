@@ -31,6 +31,7 @@ import {
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const SERIAL_SELECTION_COUNT_CHANNEL = "serial:get-last-selection-count";
+const APP_GET_VERSION_CHANNEL = "app:get-version";
 const CLIPBOARD_WRITE_TEXT_CHANNEL = "clipboard:write-text";
 const DATABASE_CHANGE_LOCATION_CHANNEL = "database:change-location";
 const DATABASE_CLEAR_PENDING_MOVE_CHANNEL = "database:clear-pending-move";
@@ -111,6 +112,7 @@ interface CoverImageFilePayload {
 app.setName("ESP Board Vault");
 applyConfiguredUserDataPath();
 
+ipcMain.handle(APP_GET_VERSION_CHANNEL, () => app.getVersion());
 ipcMain.handle(SERIAL_SELECTION_COUNT_CHANNEL, () => lastSerialPortSelectionCount);
 ipcMain.handle(CLIPBOARD_WRITE_TEXT_CHANNEL, (_event, text: unknown) => {
   if (typeof text !== "string") {

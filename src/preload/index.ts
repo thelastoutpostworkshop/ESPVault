@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { EspBoardVaultApi } from "../shared/types/api";
 
 const api: EspBoardVaultApi = {
+  app: {
+    getVersion: () => ipcRenderer.invoke("app:get-version") as Promise<string>
+  },
   backup: {
     open: () => ipcRenderer.invoke("backup:open") as Promise<{
       canceled: boolean;

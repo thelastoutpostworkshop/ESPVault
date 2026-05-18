@@ -1,9 +1,22 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 
 const channelUrl =
   "https://www.youtube.com/channel/UCnnU_HGvTr8ewpqvHe2llDw";
 const error = ref<string | null>(null);
+const appVersion = ref<string | null>(null);
+
+onMounted(() => {
+  void loadAppVersion();
+});
+
+async function loadAppVersion(): Promise<void> {
+  try {
+    appVersion.value = await window.api.app.getVersion();
+  } catch {
+    appVersion.value = null;
+  }
+}
 
 async function openChannel(): Promise<void> {
   error.value = null;
@@ -37,8 +50,22 @@ async function openChannel(): Promise<void> {
     <div class="about-layout">
       <v-card class="panel-card" flat>
         <v-card-text class="about-intro">
-          <div class="about-label">Provided by</div>
-          <h2 class="about-provider">thelastoutpostworkshop</h2>
+          <div class="about-label">Application</div>
+          <div class="about-title-row">
+            <h2 class="about-provider">ESP Board Vault</h2>
+            <v-chip
+              class="about-version-chip"
+              color="primary"
+              prepend-icon="mdi-tag-outline"
+              size="default"
+              variant="tonal"
+            >
+              Version {{ appVersion ?? "unknown" }}
+            </v-chip>
+          </div>
+          <div class="about-version-row">
+            <span>Provided by thelastoutpostworkshop</span>
+          </div>
           <p class="about-copy">
             ESP Board Vault helps makers remember their boards, scan ESP
             hardware details, group boards into projects, and keep local backup
@@ -103,10 +130,32 @@ async function openChannel(): Promise<void> {
 }
 
 .about-provider {
-  margin: 6px 0 12px;
+  margin: 0;
   color: var(--vault-text);
   font-size: 1.65rem;
   line-height: 1.2;
+}
+
+.about-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 6px 0 10px;
+}
+
+.about-version-chip {
+  font-weight: 800;
+}
+
+.about-version-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  color: var(--vault-muted);
+  font-size: 0.9rem;
 }
 
 .about-copy {
