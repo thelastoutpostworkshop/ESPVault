@@ -1,6 +1,7 @@
 import Dexie from "dexie";
 import { afterEach, describe, expect, it } from "vitest";
 import type { BoardPartition } from "../../../shared/types/partition";
+import { DexieAppSettingsRepository } from "./DexieAppSettingsRepository";
 import { DexieBackupRepository } from "./DexieBackupRepository";
 import { DexieBoardRepository } from "./DexieBoardRepository";
 import { DexieProjectChecklistRepository } from "./DexieProjectChecklistRepository";
@@ -251,6 +252,30 @@ describe("Dexie repositories", () => {
     expect(await checklists.get(first.id)).toBeNull();
   });
 
+  it("stores app settings", async () => {
+    const database = createTestDatabase();
+    const appSettings = new DexieAppSettingsRepository(database);
+
+    const created = await appSettings.set("theme", "vaultDark");
+
+    expect(created).toMatchObject({
+      key: "theme",
+      value: "vaultDark"
+    });
+    expect(await appSettings.get("theme")).toMatchObject({
+      value: "vaultDark"
+    });
+
+    await appSettings.set("theme", "vaultLight");
+    expect(await appSettings.get("theme")).toMatchObject({
+      value: "vaultLight"
+    });
+
+    expect(await appSettings.delete("theme")).toBe(true);
+    expect(await appSettings.get("theme")).toBeNull();
+    expect(await appSettings.delete("theme")).toBe(false);
+  });
+
   it("exports and imports a complete vault backup", async () => {
     const sourceDatabase = createTestDatabase();
     const targetDatabase = createTestDatabase();
@@ -289,7 +314,7 @@ describe("Dexie repositories", () => {
     });
     await sourceDatabase.appSettings.add({
       key: "theme",
-      value: "dark",
+      value: "vaultDark",
       updatedAt: now
     });
     await targetBoards.create({ name: "Existing board", status: "broken" });

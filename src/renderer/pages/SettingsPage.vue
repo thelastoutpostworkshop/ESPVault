@@ -8,7 +8,13 @@ import {
 import { repositories } from "../repositories";
 
 const backupRepository = repositories.backups;
-const { currentTheme, isDarkTheme, setTheme, themeLabel } = useVaultTheme();
+const {
+  currentTheme,
+  isDarkTheme,
+  persistCurrentTheme,
+  setTheme,
+  themeLabel
+} = useVaultTheme();
 const resettingWindowSize = ref(false);
 const copyingDatabaseLocation = ref(false);
 const changingDatabaseLocation = ref(false);
@@ -89,6 +95,7 @@ async function changeDatabaseLocation(): Promise<void> {
   notice.value = null;
 
   try {
+    await persistCurrentTheme();
     const backup = await backupRepository.exportBackup();
     const result = await window.api.database.changeLocation(
       JSON.stringify(backup, null, 2)
