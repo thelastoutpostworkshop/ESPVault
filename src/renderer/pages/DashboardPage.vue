@@ -12,9 +12,19 @@ import {
   Tooltip
 } from "chart.js";
 import type { Board } from "../../shared/types/board";
+import {
+  PROJECT_STATUSES,
+  type Project,
+  type ProjectStatus
+} from "../../shared/types/inventory";
 import type { BoardPartition } from "../../shared/types/partition";
 import { useBoardStore } from "../stores/boardStore";
-import { useProjectStore } from "../stores/projectStore";
+import { useProjectChecklistStore } from "../stores/projectChecklistStore";
+import {
+  PROJECT_STATUS_COLORS,
+  PROJECT_STATUS_LABELS,
+  useProjectStore
+} from "../stores/projectStore";
 import {
   BOARD_STATUS_COLORS,
   BOARD_STATUS_ICONS,
@@ -95,21 +105,41 @@ interface BoardStateMetric {
   color: string;
 }
 
+interface ProjectStatusMetric {
+  status: ProjectStatus;
+  label: string;
+  count: number;
+  color: string;
+}
+
+interface ProjectInsightMetric {
+  project: Project;
+  assignedBoards: number;
+  attentionBoards: number;
+  openChecklistItems: number;
+  totalChecklistItems: number;
+}
+
 const boardStore = useBoardStore();
+const checklistStore = useProjectChecklistStore();
 const projectStore = useProjectStore();
 const { boards, dashboardStats, error } = storeToRefs(boardStore);
+const { items: checklistItems } = storeToRefs(checklistStore);
 const { projects } = storeToRefs(projectStore);
 const emit = defineEmits<{
   "open-boards": [];
   "open-board": [id: string];
+  "open-project": [id: string];
 }>();
 const chipFamilyChartCanvas = ref<HTMLCanvasElement | null>(null);
+const projectStatusChartCanvas = ref<HTMLCanvasElement | null>(null);
 const partitionFlashChartCanvas = ref<HTMLCanvasElement | null>(null);
 const openFlashChartCanvas = ref<HTMLCanvasElement | null>(null);
 const knownMemoryChartCanvas = ref<HTMLCanvasElement | null>(null);
 const boardStateChartCanvas = ref<HTMLCanvasElement | null>(null);
 const labOrganizationChartCanvas = ref<HTMLCanvasElement | null>(null);
 let chipFamilyChart: Chart<"doughnut"> | null = null;
+let projectStatusChart: Chart<"doughnut"> | null = null;
 let partitionFlashChart: Chart<"doughnut"> | null = null;
 let openFlashChart: Chart<"bar"> | null = null;
 let knownMemoryChart: Chart<"bar"> | null = null;
@@ -142,6 +172,13 @@ const boardStatePalette: Record<Board["status"], string> = {
   broken: "#fb7185",
   archived: "#94a3b8",
   unknown: "#a78bfa"
+};
+const projectStatusPalette: Record<ProjectStatus, string> = {
+  active: "#2dd4bf",
+  needs_repair: "#fb7185",
+  on_hold: "#f59e0b",
+  completed: "#38bdf8",
+  archived: "#94a3b8"
 };
 const labOrganizationPalette = {
   available: "#22c55e",
@@ -258,6 +295,75 @@ const projectGroupsInUse = computed(
         .map((board) => board.projectId)
         .filter((projectId): projectId is string => Boolean(projectId))
     ).size
+);
+const activeProjects = computed(
+  () => projects.value.filter((project) => project.status === "active").length
+);
+const projectsWithBoards = computed(
+  () =>
+    projects.value.filter((project) =>
+      boards.value.some((board) => board.projectId === project.id)
+    ).length
+);
+const projectCoveragePercent = computed(() =>
+  getPercent(projectsWithBoards.value, projects.value.length)
+);
+const openProjectChecklistItems = computed(
+  () => checklistItems.value.filter((item) => !item.completed).length
+);
+const projectStatusMetrics = computed<ProjectStatusMetric[]>(() =>
+  PROJECT_STATUSES.map((status) => ({
+    status,
+    label: PROJECT_STATUS_LABELS[status],
+    count: projects.value.filter((project) => project.status === status).length,
+    color: projectStatusPalette[status]
+  })).filter((metric) => metric.count > 0)
+);
+const projectStatusChartKey = computed(() =>
+  projectStatusMetrics.value
+    .map((metric) => `${metric.status}:${metric.count}`)
+    .join("|")
+);
+const allProjectInsightMetrics = computed<ProjectInsightMetric[]>(() =>
+  projects.value
+    .map((project) => {
+      const projectBoards = boards.value.filter(
+        (board) => board.projectId === project.id
+      );
+      const projectChecklistItems = checklistItems.value.filter(
+        (item) => item.projectId === project.id
+      );
+
+      return {
+        project,
+        assignedBoards: projectBoards.length,
+        attentionBoards: projectBoards.filter((board) =>
+          ["broken", "needs_flashing", "unknown"].includes(board.status)
+        ).length,
+        openChecklistItems: projectChecklistItems.filter((item) => !item.completed)
+          .length,
+        totalChecklistItems: projectChecklistItems.length
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.attentionBoards - left.attentionBoards ||
+        right.openChecklistItems - left.openChecklistItems ||
+        right.assignedBoards - left.assignedBoards ||
+        left.project.name.localeCompare(right.project.name)
+    )
+);
+const projectInsightMetrics = computed<ProjectInsightMetric[]>(() =>
+  allProjectInsightMetrics.value.slice(0, 5)
+);
+const projectsNeedingAttention = computed(
+  () =>
+    allProjectInsightMetrics.value.filter(
+      (metric) =>
+        metric.project.status === "needs_repair" ||
+        metric.attentionBoards > 0 ||
+        metric.openChecklistItems > 0
+    ).length
 );
 const labOrganizationMetrics = computed<LabOrganizationMetric[]>(() => {
   const metrics = new Map<string, LabOrganizationMetric>();
@@ -553,6 +659,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   chipFamilyChart?.destroy();
+  projectStatusChart?.destroy();
   partitionFlashChart?.destroy();
   openFlashChart?.destroy();
   knownMemoryChart?.destroy();
@@ -560,6 +667,7 @@ onBeforeUnmount(() => {
   labOrganizationChart?.destroy();
   themeObserver?.disconnect();
   chipFamilyChart = null;
+  projectStatusChart = null;
   partitionFlashChart = null;
   openFlashChart = null;
   knownMemoryChart = null;
@@ -574,6 +682,13 @@ watch(
     void nextTick(renderChipFamilyChart);
   },
   { deep: true }
+);
+
+watch(
+  projectStatusChartKey,
+  () => {
+    void nextTick(renderProjectStatusChart);
+  }
 );
 
 watch(
@@ -606,6 +721,7 @@ watch(
 
 function renderDashboardCharts(): void {
   renderChipFamilyChart();
+  renderProjectStatusChart();
   renderPartitionCharts();
   renderKnownMemoryChart();
   renderBoardStateChart();
@@ -659,6 +775,56 @@ function renderChipFamilyChart(): void {
               const label = context.label || "Unknown";
               const value = Number(context.parsed) || 0;
               return `${label}: ${value} board${value === 1 ? "" : "s"}`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderProjectStatusChart(): void {
+  const canvas = projectStatusChartCanvas.value;
+  const metrics = projectStatusMetrics.value;
+
+  projectStatusChart?.destroy();
+  projectStatusChart = null;
+
+  if (!canvas || !metrics.length) {
+    return;
+  }
+
+  projectStatusChart = new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: metrics.map((metric) => metric.label),
+      datasets: [
+        {
+          data: metrics.map((metric) => metric.count),
+          backgroundColor: metrics.map((metric) => metric.color),
+          borderColor: getChartBorderColor(),
+          borderRadius: 3,
+          borderWidth: 4,
+          spacing: 2,
+          hoverBorderColor: "rgba(255, 255, 255, 0.78)",
+          hoverOffset: 6
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "67%",
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          ...getChartTooltipBase(),
+          callbacks: {
+            label: (context) => {
+              const value = Number(context.parsed) || 0;
+              return `${context.label}: ${value} project${value === 1 ? "" : "s"}`;
             }
           }
         }
@@ -1030,7 +1196,11 @@ function renderLabOrganizationChart(): void {
 }
 
 async function refreshDashboard(): Promise<void> {
-  await Promise.all([boardStore.refresh(), projectStore.loadProjects()]);
+  await Promise.all([
+    boardStore.refresh(),
+    projectStore.loadProjects(),
+    checklistStore.loadItems()
+  ]);
 }
 
 function formatRecordedCount(count: number): string {
@@ -1053,6 +1223,37 @@ function parseDateMs(value: string | null): number | null {
 
 function getPercent(value: number, total: number): number {
   return total > 0 ? Math.round((value / total) * 100) : 0;
+}
+
+function projectChecklistPercent(metric: ProjectInsightMetric): number {
+  return getPercent(
+    metric.totalChecklistItems - metric.openChecklistItems,
+    metric.totalChecklistItems
+  );
+}
+
+function projectInsightColor(metric: ProjectInsightMetric): string {
+  if (metric.project.status === "needs_repair" || metric.attentionBoards > 0) {
+    return "warning";
+  }
+
+  if (metric.openChecklistItems > 0) {
+    return "info";
+  }
+
+  return "success";
+}
+
+function projectInsightLabel(metric: ProjectInsightMetric): string {
+  if (metric.attentionBoards > 0) {
+    return `${metric.attentionBoards} board${metric.attentionBoards === 1 ? "" : "s"} need attention`;
+  }
+
+  if (metric.openChecklistItems > 0) {
+    return `${metric.openChecklistItems} open task${metric.openChecklistItems === 1 ? "" : "s"}`;
+  }
+
+  return "On track";
 }
 
 function createLabOrganizationMetric(
@@ -1258,6 +1459,122 @@ function getCssVariable(name: string, fallback: string): string {
         </div>
       </div>
     </div>
+
+    <v-card class="panel-card dashboard-panel project-insights-panel" flat>
+      <v-card-title class="text-subtitle-1 font-weight-bold project-insights-title">
+        <v-icon class="mr-2" color="primary" icon="mdi-folder-chart-outline" />
+        Project insights
+      </v-card-title>
+      <v-divider />
+
+      <div v-if="projects.length" class="project-insights-grid">
+        <div class="project-status-visual">
+          <div class="project-status-chart-wrap">
+            <canvas
+              ref="projectStatusChartCanvas"
+              aria-label="Project status distribution chart"
+            />
+            <div class="project-status-chart-center">
+              <strong>{{ projects.length }}</strong>
+              <span>projects</span>
+            </div>
+          </div>
+
+          <div class="project-status-copy">
+            <div class="metric-label">Status mix</div>
+            <div class="project-status-headline">
+              {{ activeProjects }} active /
+              {{ projectsNeedingAttention }} needing attention
+            </div>
+            <div class="project-status-legend">
+              <v-chip
+                v-for="metric in projectStatusMetrics"
+                :key="metric.status"
+                :color="PROJECT_STATUS_COLORS[metric.status]"
+                :prepend-icon="metric.status === 'needs_repair' ? 'mdi-wrench-outline' : 'mdi-folder-outline'"
+                size="small"
+                variant="tonal"
+              >
+                {{ metric.count }} {{ metric.label }}
+              </v-chip>
+            </div>
+          </div>
+        </div>
+
+        <div class="project-kpi-grid">
+          <div class="project-kpi">
+            <v-icon color="success" icon="mdi-folder-check-outline" />
+            <div>
+              <strong>{{ projectCoveragePercent }}%</strong>
+              <span>with assigned boards</span>
+            </div>
+          </div>
+          <div class="project-kpi">
+            <v-icon color="info" icon="mdi-format-list-checks" />
+            <div>
+              <strong>{{ openProjectChecklistItems }}</strong>
+              <span>open checklist tasks</span>
+            </div>
+          </div>
+          <div class="project-kpi">
+            <v-icon color="warning" icon="mdi-alert-outline" />
+            <div>
+              <strong>{{ projectsNeedingAttention }}</strong>
+              <span>projects to review</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="project-focus-list">
+          <div class="project-focus-heading">
+            <div>
+              <div class="metric-label">Project focus</div>
+              <strong>Boards, tasks, and repair pressure</strong>
+            </div>
+          </div>
+
+          <div class="project-focus-rows">
+            <button
+              v-for="metric in projectInsightMetrics"
+              :key="metric.project.id"
+              class="project-focus-row"
+              type="button"
+              @click="emit('open-project', metric.project.id)"
+            >
+              <div class="project-focus-main">
+                <div class="project-focus-name">
+                  {{ metric.project.name }}
+                </div>
+                <div class="project-focus-meta">
+                  {{ metric.assignedBoards }} board{{ metric.assignedBoards === 1 ? "" : "s" }} /
+                  {{ metric.openChecklistItems }} open task{{ metric.openChecklistItems === 1 ? "" : "s" }}
+                </div>
+              </div>
+              <div class="project-focus-progress">
+                <span
+                  :style="{ width: `${projectChecklistPercent(metric)}%` }"
+                />
+              </div>
+              <v-chip
+                :color="projectInsightColor(metric)"
+                size="x-small"
+                variant="tonal"
+              >
+                {{ projectInsightLabel(metric) }}
+              </v-chip>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="empty-state ma-4">
+        <v-icon icon="mdi-folder-plus-outline" size="34" color="primary" />
+        <div class="text-subtitle-1 font-weight-bold mt-2">No project insights yet.</div>
+        <div class="text-body-2 muted mt-1">
+          Create projects and assign boards to see status, task, and repair pressure.
+        </div>
+      </div>
+    </v-card>
 
     <div class="dashboard-main-grid">
       <v-card class="panel-card dashboard-panel chip-family-panel" flat>
@@ -1820,6 +2137,239 @@ function getCssVariable(name: string, fallback: string): string {
   font-size: 0.8rem;
   font-weight: 750;
   text-transform: uppercase;
+}
+
+.project-insights-panel {
+  overflow: hidden;
+}
+
+.project-insights-title {
+  background:
+    radial-gradient(circle at 10% 22%, rgba(var(--v-theme-primary), 0.16), transparent 32%),
+    rgba(var(--v-theme-surface), 0.38);
+}
+
+.project-insights-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(220px, 0.55fr) minmax(360px, 1fr);
+  gap: 16px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 12% 32%, rgba(var(--v-theme-primary), 0.1), transparent 28%),
+    radial-gradient(circle at 78% 16%, rgba(var(--v-theme-accent), 0.08), transparent 28%),
+    linear-gradient(135deg, rgba(var(--v-theme-surface), 0.78), rgba(var(--v-theme-background), 0.18));
+}
+
+.project-status-visual,
+.project-kpi,
+.project-focus-list {
+  border: 1px solid var(--vault-soft-border);
+  border-radius: 8px;
+  background: rgba(var(--v-theme-surface), 0.48);
+}
+
+.project-status-visual {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+}
+
+.project-status-chart-wrap {
+  position: relative;
+  width: min(184px, 46vw);
+  aspect-ratio: 1;
+  justify-self: center;
+}
+
+.project-status-chart-wrap canvas {
+  position: relative;
+  z-index: 2;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.project-status-chart-wrap::before {
+  position: absolute;
+  inset: 10%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(var(--v-theme-primary), 0.12), transparent 62%);
+  box-shadow: 0 0 42px rgba(var(--v-theme-primary), 0.16);
+  content: "";
+}
+
+.project-status-chart-center {
+  position: absolute;
+  z-index: 1;
+  inset: 30%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border: 1px solid rgba(var(--v-theme-primary), 0.18);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(var(--v-theme-surface), 0.96), rgba(var(--v-theme-background), 0.78));
+  box-shadow: inset 0 0 24px rgba(var(--v-theme-primary), 0.1);
+  pointer-events: none;
+}
+
+.project-status-chart-center strong {
+  color: var(--vault-text);
+  font-size: 1.35rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.project-status-chart-center span {
+  margin-top: 4px;
+  color: var(--vault-muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.project-status-copy {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.project-status-headline {
+  color: var(--vault-text);
+  font-size: 1.18rem;
+  font-weight: 850;
+  line-height: 1.22;
+}
+
+.project-status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-kpi-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.project-kpi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 86px;
+  padding: 14px;
+}
+
+.project-kpi :deep(.v-icon) {
+  flex: 0 0 auto;
+}
+
+.project-kpi div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.project-kpi strong {
+  color: var(--vault-text);
+  font-size: 1.18rem;
+  font-weight: 850;
+}
+
+.project-kpi span {
+  color: var(--vault-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.project-focus-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.project-focus-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-focus-heading strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--vault-text);
+  font-size: 1rem;
+}
+
+.project-focus-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.project-focus-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 0.28fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(var(--v-theme-surface), 0.4);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.project-focus-row:hover,
+.project-focus-row:focus-visible {
+  border-color: rgba(var(--v-theme-primary), 0.34);
+  background: rgba(var(--v-theme-primary), 0.08);
+  outline: none;
+}
+
+.project-focus-main {
+  min-width: 0;
+}
+
+.project-focus-name,
+.project-focus-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-focus-name {
+  color: var(--vault-text);
+  font-weight: 800;
+}
+
+.project-focus-meta {
+  margin-top: 2px;
+  color: var(--vault-muted);
+  font-size: 0.76rem;
+}
+
+.project-focus-progress {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(var(--v-theme-surface-variant), 0.78);
+}
+
+.project-focus-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(var(--v-theme-primary)), rgb(var(--v-theme-success)));
 }
 
 .dashboard-snapshot {
@@ -2735,6 +3285,7 @@ function getCssVariable(name: string, fallback: string): string {
 
 @media (max-width: 720px) {
   .chip-family-chart-card,
+  .project-status-visual,
   .partition-flash-summary {
     grid-template-columns: 1fr;
   }
@@ -2751,6 +3302,7 @@ function getCssVariable(name: string, fallback: string): string {
 }
 
 @media (max-width: 1500px) and (min-width: 1181px) {
+  .project-insights-grid,
   .partition-insights-grid {
     grid-template-columns: 1fr;
   }
@@ -2758,6 +3310,7 @@ function getCssVariable(name: string, fallback: string): string {
 
 @media (max-width: 1180px) {
   .dashboard-main-grid,
+  .project-insights-grid,
   .dashboard-snapshot,
   .partition-insights-grid {
     grid-template-columns: 1fr;
@@ -2793,6 +3346,10 @@ function getCssVariable(name: string, fallback: string): string {
   }
 
   .partition-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-focus-row {
     grid-template-columns: 1fr;
   }
 
