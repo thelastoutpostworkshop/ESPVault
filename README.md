@@ -116,30 +116,3 @@ not just a single plain database file.
 
 Your inventory stays on your machine. Serial scans, board metadata, backups, and
 project notes remain local unless you explicitly export or share them.
-
-## For Contributors
-
-Install and run:
-
-```bash
-npm install
-npm run dev
-```
-
-Verify:
-
-```bash
-npm run typecheck
-npm run build
-```
-
-Main stack:
-
-- Electron
-- Vue 3
-- TypeScript
-- Vite
-- Vuetify
-- Pinia
-- Dexie and IndexedDB
-- `tasmota-webserial-esptool`
