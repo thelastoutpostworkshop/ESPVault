@@ -189,7 +189,7 @@ const checklistTemplates: ChecklistTemplate[] = [
   { title: "Test Wi-Fi connection", category: "testing" },
   { title: "Capture firmware version", category: "documentation" },
   { title: "Document enclosure/location", category: "enclosure" },
-  { title: "Backup config", category: "documentation" }
+  { title: "Save device config", category: "documentation" }
 ];
 
 const projectRows = computed<ProjectRow[]>(() =>
