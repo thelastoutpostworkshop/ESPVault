@@ -3,6 +3,7 @@ productName: ESP Board Vault
 copyright: Copyright 2026 The Last Outpost Workshop
 
 directories:
+  buildResources: build
   output: release
 
 files:
@@ -12,9 +13,11 @@ files:
 
 asar: true
 npmRebuild: false
+afterPack: scripts/after-pack-icons.cjs
 
 win:
   artifactName: ${productName}-${version}-windows-${arch}.${ext}
+  icon: icon.ico
   signAndEditExecutable: false
   target:
     - target: nsis
@@ -32,6 +35,7 @@ nsis:
 mac:
   artifactName: ${productName}-${version}-macos-${arch}.${ext}
   category: public.app-category.developer-tools
+  icon: icon.icns
   target:
     - target: dmg
       arch:
@@ -45,6 +49,7 @@ mac:
 linux:
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
   category: Development
+  icon: icon.png
   target:
     - target: AppImage
       arch:
