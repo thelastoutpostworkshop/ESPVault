@@ -43,6 +43,18 @@ const backupReminder = computed(() =>
 const lastBackupLabel = computed(() =>
   lastBackupAt.value ? formatDate(lastBackupAt.value) : "No backup recorded yet"
 );
+const lastBackupAppVersionLabel = computed(() => {
+  if (!lastBackupAt.value) {
+    return null;
+  }
+
+  return lastBackupAppVersion.value
+    ? `Backup app ${lastBackupAppVersion.value}`
+    : "Backup app version not recorded";
+});
+const currentAppVersionLabel = computed(() =>
+  currentAppVersion.value ? `Current app ${currentAppVersion.value}` : null
+);
 const lastBackupStatusColor = computed(() =>
   backupReminder.value.shouldWarn ? "warning" : "success"
 );
@@ -252,6 +264,21 @@ onMounted(() => {
               {{ lastBackupLabel }}
             </div>
             <div
+              v-if="lastBackupAppVersionLabel"
+              class="backup-version-row mt-2"
+            >
+              <span>
+                <v-icon icon="mdi-tag-outline" size="14" />
+                {{ lastBackupAppVersionLabel }}
+              </span>
+              <span
+                v-if="backupReminder.status === 'version_mismatch' && currentAppVersionLabel"
+              >
+                <v-icon icon="mdi-update" size="14" />
+                {{ currentAppVersionLabel }}
+              </span>
+            </div>
+            <div
               v-if="backupStatusLoaded && backupReminder.status === 'stale'"
               class="text-caption muted mt-1"
             >
@@ -419,6 +446,21 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.backup-version-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.backup-version-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--vault-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .backup-card-body {
