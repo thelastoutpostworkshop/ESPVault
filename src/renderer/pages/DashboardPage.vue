@@ -123,6 +123,7 @@ interface ProjectInsightMetric {
 const boardStore = useBoardStore();
 const checklistStore = useProjectChecklistStore();
 const projectStore = useProjectStore();
+const isDevelopmentMode = import.meta.env.DEV;
 const { boards, dashboardStats, error } = storeToRefs(boardStore);
 const { items: checklistItems } = storeToRefs(checklistStore);
 const { projects } = storeToRefs(projectStore);
@@ -1427,6 +1428,16 @@ function getCssVariable(name: string, fallback: string): string {
   <section class="page-shell dashboard-shell">
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
       {{ error }}
+    </v-alert>
+
+    <v-alert
+      v-if="isDevelopmentMode"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+    >
+      Development mode uses its own app data profile. Boards, projects, and
+      appearance settings are separate from the release app.
     </v-alert>
 
     <div class="dashboard-insights">

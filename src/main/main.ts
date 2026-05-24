@@ -28,6 +28,7 @@ import {
   type VaultBackup,
   type VaultBackupFile
 } from "../shared/types/backup";
+import { prepareUpgradeSnapshot } from "./upgradeSnapshots";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const SERIAL_SELECTION_COUNT_CHANNEL = "serial:get-last-selection-count";
@@ -109,7 +110,7 @@ interface CoverImageFilePayload {
   mimeType: string | null;
 }
 
-app.setName("ESP Board Vault");
+app.setName(isDevelopment ? "ESP Board Vault Dev" : "ESP Board Vault");
 applyConfiguredUserDataPath();
 
 ipcMain.handle(APP_GET_VERSION_CHANNEL, () => app.getVersion());
@@ -326,7 +327,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: MIN_WINDOW_SIZE.width,
     minHeight: MIN_WINDOW_SIZE.height,
     autoHideMenuBar: true,
-    title: "ESP Board Vault",
+    title: app.getName(),
     backgroundColor: "#f7f8f5",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -2091,6 +2092,8 @@ function escapeHtml(value: string): string {
 }
 
 app.whenReady().then(() => {
+  prepareUpgradeSnapshotBeforeRenderer();
+
   if (process.platform !== "darwin") {
     Menu.setApplicationMenu(null);
   }
@@ -2103,6 +2106,21 @@ app.whenReady().then(() => {
     }
   });
 });
+
+function prepareUpgradeSnapshotBeforeRenderer(): void {
+  if (isDevelopment) {
+    return;
+  }
+
+  try {
+    prepareUpgradeSnapshot({
+      appVersion: app.getVersion(),
+      userDataPath: app.getPath("userData")
+    });
+  } catch (caughtError) {
+    console.warn("Upgrade safety snapshot could not be created.", caughtError);
+  }
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

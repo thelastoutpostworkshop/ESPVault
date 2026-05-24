@@ -237,6 +237,11 @@ native LevelDB bindings.
 Dexie-specific schema and table declarations belong under
 `src/renderer/storage/dexie/`. Repository interfaces must stay Dexie-free.
 
+Whenever adding a new Dexie schema version, add or update migration tests that
+open every supported historical schema version and verify it normalizes into
+the current schema. Keep these tests near the Dexie repository tests, currently
+`src/renderer/storage/dexie/dexieRepositories.test.ts`.
+
 Binary files such as photos, firmware files, and backups must not be stored
 directly in IndexedDB for the MVP. Store metadata in Dexie and copy the actual
 files into Electron `userData` through the main process.
