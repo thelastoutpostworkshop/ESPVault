@@ -274,6 +274,20 @@ onMounted(() => {
       </v-card-text>
     </v-card>
 
+    <v-alert
+      class="mb-4"
+      type="info"
+      variant="tonal"
+    >
+      <template #title>
+        Automatic upgrade safety snapshots
+      </template>
+      ESP Board Vault creates local safety snapshots inside app data before
+      release upgrades. They help recover from upgrade issues, but they are not
+      portable backup files. Export a backup when you need a copy outside this
+      app data folder.
+    </v-alert>
+
     <div class="backup-grid">
       <v-card class="panel-card" flat>
         <v-card-title class="text-subtitle-1 font-weight-bold">
