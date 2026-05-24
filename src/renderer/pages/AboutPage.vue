@@ -64,7 +64,7 @@ async function openChannel(): Promise<void> {
             </v-chip>
           </div>
           <div class="about-version-row">
-            <span>Provided by thelastoutpostworkshop</span>
+            <span>Provided by TheLastOutpostWorkshop</span>
           </div>
           <p class="about-copy">
             ESP Board Vault helps makers remember their boards, scan ESP
