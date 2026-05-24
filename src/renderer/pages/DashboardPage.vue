@@ -120,6 +120,21 @@ interface ProjectInsightMetric {
   totalChecklistItems: number;
 }
 
+interface ActivityHeatmapDay {
+  count: number;
+  date: Date;
+  events: string[];
+  future: boolean;
+  isoDate: string;
+  level: number;
+}
+
+interface ActivityHeatmapWeek {
+  days: ActivityHeatmapDay[];
+  key: string;
+  monthLabel: string | null;
+}
+
 const boardStore = useBoardStore();
 const checklistStore = useProjectChecklistStore();
 const projectStore = useProjectStore();
@@ -187,6 +202,8 @@ const labOrganizationPalette = {
   attention: "#f59e0b",
   archived: "#94a3b8"
 };
+const activityHeatmapLevels = [0, 1, 2, 3, 4];
+const activityHeatmapWeekdayLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
 const boardStatusChartOrder: Board["status"][] = [
   "available",
   "in_use",
@@ -195,6 +212,7 @@ const boardStatusChartOrder: Board["status"][] = [
   "unknown",
   "archived"
 ];
+const ACTIVITY_HEATMAP_WEEKS = 26;
 const DEFAULT_PARTITION_TABLE_OFFSET = 0x8000;
 const PARTITION_TABLE_REGION_SIZE = 0x1000;
 
@@ -645,6 +663,99 @@ const recentActivity = computed(() => {
     )
     .slice(0, 6);
 });
+const activityEventsByDate = computed(() => {
+  const events = new Map<string, string[]>();
+
+  for (const board of boards.value) {
+    addActivityEvent(events, board.createdAt, "Board added");
+    addActivityEvent(events, board.lastScannedAt, "Board scanned");
+
+    if (board.lastConnectedAt !== board.lastScannedAt) {
+      addActivityEvent(events, board.lastConnectedAt, "Board connected");
+    }
+
+    if (
+      board.updatedAt !== board.createdAt &&
+      board.updatedAt !== board.lastScannedAt
+    ) {
+      addActivityEvent(events, board.updatedAt, "Board updated");
+    }
+  }
+
+  for (const project of projects.value) {
+    addActivityEvent(events, project.createdAt, "Project created");
+
+    if (project.updatedAt !== project.createdAt) {
+      addActivityEvent(events, project.updatedAt, "Project updated");
+    }
+  }
+
+  for (const item of checklistItems.value) {
+    addActivityEvent(events, item.createdAt, "Checklist item added");
+    addActivityEvent(events, item.completedAt, "Checklist item completed");
+
+    if (
+      item.updatedAt !== item.createdAt &&
+      item.updatedAt !== item.completedAt
+    ) {
+      addActivityEvent(events, item.updatedAt, "Checklist item updated");
+    }
+  }
+
+  return events;
+});
+const activityHeatmapWeeks = computed<ActivityHeatmapWeek[]>(() => {
+  const today = startOfLocalDay(new Date());
+  const currentWeekStart = addDays(today, -today.getDay());
+  const firstWeekStart = addDays(
+    currentWeekStart,
+    -(ACTIVITY_HEATMAP_WEEKS - 1) * 7
+  );
+
+  return Array.from({ length: ACTIVITY_HEATMAP_WEEKS }, (_, weekIndex) => {
+    const weekStart = addDays(firstWeekStart, weekIndex * 7);
+    const previousWeekStart =
+      weekIndex > 0 ? addDays(firstWeekStart, (weekIndex - 1) * 7) : null;
+
+    return {
+      days: Array.from({ length: 7 }, (_dayValue, dayIndex) => {
+        const date = addDays(weekStart, dayIndex);
+        const isoDate = toLocalDateKey(date);
+        const future = date.getTime() > today.getTime();
+        const events = future ? [] : activityEventsByDate.value.get(isoDate) ?? [];
+        const count = events.length;
+
+        return {
+          count,
+          date,
+          events,
+          future,
+          isoDate,
+          level: future ? 0 : getActivityHeatmapLevel(count)
+        };
+      }),
+      key: toLocalDateKey(weekStart),
+      monthLabel: getActivityHeatmapMonthLabel(weekStart, previousWeekStart)
+    };
+  });
+});
+const activityHeatmapDays = computed(() =>
+  activityHeatmapWeeks.value.flatMap((week) => week.days)
+);
+const activityHeatmapTotal = computed(() =>
+  activityHeatmapDays.value.reduce((total, day) => total + day.count, 0)
+);
+const activityHeatmapActiveDays = computed(
+  () => activityHeatmapDays.value.filter((day) => day.count > 0).length
+);
+const activityHeatmapBusiestDay = computed(() =>
+  activityHeatmapDays.value.reduce<ActivityHeatmapDay | null>(
+    (busiestDay, day) =>
+      !day.future && day.count > (busiestDay?.count ?? 0) ? day : busiestDay,
+    null
+  )
+);
+const hasVaultActivity = computed(() => activityHeatmapTotal.value > 0);
 
 onMounted(() => {
   void refreshDashboard();
@@ -1220,6 +1331,114 @@ function parseDateMs(value: string | null): number | null {
 
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function addActivityEvent(
+  events: Map<string, string[]>,
+  value: string | null,
+  label: string
+): void {
+  const dateMs = parseDateMs(value);
+
+  if (dateMs === null) {
+    return;
+  }
+
+  const dateKey = toLocalDateKey(new Date(dateMs));
+  events.set(dateKey, [...(events.get(dateKey) ?? []), label]);
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date: Date, days: number): Date {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return startOfLocalDay(nextDate);
+}
+
+function toLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getActivityHeatmapLevel(count: number): number {
+  if (count <= 0) return 0;
+  if (count === 1) return 1;
+  if (count <= 3) return 2;
+  if (count <= 6) return 3;
+  return 4;
+}
+
+function getActivityHeatmapMonthLabel(
+  weekStart: Date,
+  previousWeekStart: Date | null
+): string | null {
+  const weekMidpoint = addDays(weekStart, 3);
+  const previousWeekMidpoint = previousWeekStart
+    ? addDays(previousWeekStart, 3)
+    : null;
+
+  if (
+    previousWeekMidpoint &&
+    previousWeekMidpoint.getMonth() === weekMidpoint.getMonth()
+  ) {
+    return null;
+  }
+
+  return formatActivityHeatmapMonth(weekMidpoint);
+}
+
+function formatActivityHeatmapMonth(date: Date): string {
+  return date.toLocaleDateString(undefined, { month: "short" });
+}
+
+function formatActivityHeatmapDate(date: Date): string {
+  return date.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function formatActivityHeatmapTooltip(day: ActivityHeatmapDay): string {
+  const dateLabel = formatActivityHeatmapDate(day.date);
+
+  if (day.future) {
+    return `${dateLabel}: Not tracked yet`;
+  }
+
+  if (day.count === 0) {
+    return `${dateLabel}: No vault activity`;
+  }
+
+  const uniqueEvents = Array.from(new Set(day.events));
+  const visibleEvents = uniqueEvents.slice(0, 3).join(", ");
+  const hiddenEventCount = Math.max(uniqueEvents.length - 3, 0);
+  const eventSummary = hiddenEventCount
+    ? `${visibleEvents}, +${hiddenEventCount} more`
+    : visibleEvents;
+
+  return `${dateLabel}: ${day.count} ${formatActivityEventCount(
+    day.count
+  )} (${eventSummary})`;
+}
+
+function formatActivityEventCount(count: number): string {
+  return `event${count === 1 ? "" : "s"}`;
+}
+
+function formatActivityHeatmapBusiestDay(): string {
+  const day = activityHeatmapBusiestDay.value;
+
+  if (!day || day.count === 0) {
+    return "No activity yet";
+  }
+
+  return `${formatActivityHeatmapDate(day.date)} / ${day.count} ${formatActivityEventCount(day.count)}`;
 }
 
 function getPercent(value: number, total: number): number {
@@ -2012,6 +2231,116 @@ function getCssVariable(name: string, fallback: string): string {
       </div>
     </div>
 
+    <v-card class="panel-card dashboard-panel vault-activity-panel" flat>
+      <v-card-title class="text-subtitle-1 font-weight-bold">
+        <v-icon class="mr-2" color="primary" icon="mdi-calendar-range" />
+        Vault activity
+        <v-spacer />
+        <v-chip color="primary" size="small" variant="tonal">
+          Last {{ ACTIVITY_HEATMAP_WEEKS }} weeks
+        </v-chip>
+      </v-card-title>
+      <v-divider />
+
+      <div v-if="hasVaultActivity" class="vault-activity-body">
+        <div class="vault-activity-summary">
+          <div>
+            <span>Total events</span>
+            <strong>{{ activityHeatmapTotal }}</strong>
+          </div>
+          <div>
+            <span>Active days</span>
+            <strong>{{ activityHeatmapActiveDays }}</strong>
+          </div>
+          <div>
+            <span>Busiest day</span>
+            <strong>{{ formatActivityHeatmapBusiestDay() }}</strong>
+          </div>
+        </div>
+
+        <div class="activity-heatmap-scroll">
+          <div class="activity-heatmap-month-row">
+            <div class="activity-heatmap-month-spacer" />
+            <div
+              class="activity-heatmap-months"
+              :style="{
+                gridTemplateColumns: `repeat(${activityHeatmapWeeks.length}, 13px)`
+              }"
+            >
+              <span
+                v-for="week in activityHeatmapWeeks"
+                :key="`month-${week.key}`"
+              >
+                {{ week.monthLabel }}
+              </span>
+            </div>
+          </div>
+
+          <div class="activity-heatmap-grid">
+            <div class="activity-heatmap-weekdays">
+              <span
+                v-for="(label, index) in activityHeatmapWeekdayLabels"
+                :key="`weekday-${index}`"
+              >
+                {{ label }}
+              </span>
+            </div>
+
+            <div
+              class="activity-heatmap-weeks"
+              :style="{
+                gridTemplateColumns: `repeat(${activityHeatmapWeeks.length}, 13px)`
+              }"
+            >
+              <div
+                v-for="week in activityHeatmapWeeks"
+                :key="week.key"
+                class="activity-heatmap-week"
+              >
+                <v-tooltip
+                  v-for="day in week.days"
+                  :key="day.isoDate"
+                  :text="formatActivityHeatmapTooltip(day)"
+                  location="top"
+                >
+                  <template #activator="{ props: tooltipProps }">
+                    <span
+                      v-bind="tooltipProps"
+                      class="activity-heatmap-cell"
+                      :class="[
+                        `activity-heatmap-cell--level-${day.level}`,
+                        { 'activity-heatmap-cell--future': day.future }
+                      ]"
+                      :aria-label="formatActivityHeatmapTooltip(day)"
+                    />
+                  </template>
+                </v-tooltip>
+              </div>
+            </div>
+          </div>
+
+          <div class="activity-heatmap-legend">
+            <span>Less</span>
+            <i
+              v-for="level in activityHeatmapLevels"
+              :key="level"
+              class="activity-heatmap-cell"
+              :class="`activity-heatmap-cell--level-${level}`"
+            />
+            <span>More</span>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="empty-state ma-4">
+        <v-icon icon="mdi-calendar-blank-outline" size="34" color="primary" />
+        <div class="text-subtitle-1 font-weight-bold mt-2">No vault activity yet.</div>
+        <div class="text-body-2 muted mt-1">
+          Add boards, scan hardware, or create projects to build an activity pattern.
+        </div>
+      </div>
+    </v-card>
+
     <v-card class="panel-card dashboard-panel recent-activity-panel" flat>
         <v-card-title class="text-subtitle-1 font-weight-bold">
           <v-icon class="mr-2" color="primary" icon="mdi-history" />
@@ -2737,6 +3066,152 @@ function getCssVariable(name: string, fallback: string): string {
   min-height: 0;
 }
 
+.vault-activity-panel {
+  overflow: hidden;
+}
+
+.vault-activity-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.28fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  padding: 18px;
+}
+
+.vault-activity-summary {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vault-activity-summary div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--vault-soft-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(var(--v-theme-surface), 0.44);
+}
+
+.vault-activity-summary span {
+  overflow: hidden;
+  color: var(--vault-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vault-activity-summary strong {
+  min-width: 0;
+  color: var(--vault-text);
+  font-size: 1.05rem;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.activity-heatmap-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.activity-heatmap-month-row,
+.activity-heatmap-grid {
+  display: grid;
+  grid-template-columns: 32px max-content;
+  gap: 8px;
+}
+
+.activity-heatmap-month-spacer {
+  width: 32px;
+}
+
+.activity-heatmap-months {
+  display: grid;
+  gap: 4px;
+  min-width: max-content;
+  color: var(--vault-muted);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.activity-heatmap-months span {
+  min-width: 13px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.activity-heatmap-grid {
+  margin-top: 6px;
+}
+
+.activity-heatmap-weekdays,
+.activity-heatmap-week {
+  display: grid;
+  grid-template-rows: repeat(7, 13px);
+  gap: 4px;
+}
+
+.activity-heatmap-weekdays span {
+  color: var(--vault-muted);
+  font-size: 0.7rem;
+  line-height: 13px;
+  text-align: right;
+}
+
+.activity-heatmap-weeks {
+  display: grid;
+  gap: 4px;
+  min-width: max-content;
+}
+
+.activity-heatmap-cell {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.07);
+  border-radius: 3px;
+  background: rgba(var(--v-theme-surface-variant), 0.42);
+}
+
+.activity-heatmap-cell--level-1 {
+  border-color: rgba(var(--v-theme-primary), 0.2);
+  background: rgba(var(--v-theme-primary), 0.22);
+}
+
+.activity-heatmap-cell--level-2 {
+  border-color: rgba(var(--v-theme-primary), 0.34);
+  background: rgba(var(--v-theme-primary), 0.42);
+}
+
+.activity-heatmap-cell--level-3 {
+  border-color: rgba(var(--v-theme-primary), 0.5);
+  background: rgba(var(--v-theme-primary), 0.72);
+}
+
+.activity-heatmap-cell--level-4 {
+  border-color: rgba(var(--v-theme-success), 0.58);
+  background: rgb(var(--v-theme-success));
+}
+
+.activity-heatmap-cell--future {
+  opacity: 0.28;
+}
+
+.activity-heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: max-content;
+  margin-top: 12px;
+  color: var(--vault-muted);
+  font-size: 0.72rem;
+}
+
 .chip-family-panel {
   overflow: hidden;
 }
@@ -3336,6 +3811,14 @@ function getCssVariable(name: string, fallback: string): string {
     grid-template-columns: 1fr;
   }
 
+  .vault-activity-body {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-activity-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .project-focus-list {
     grid-column: auto;
     grid-row: auto;
@@ -3368,6 +3851,10 @@ function getCssVariable(name: string, fallback: string): string {
   .lab-organization-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .vault-activity-summary {
+    grid-template-columns: 1fr;
   }
 
   .partition-kpi-grid {
