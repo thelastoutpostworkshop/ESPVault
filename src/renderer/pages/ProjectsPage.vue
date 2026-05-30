@@ -1111,6 +1111,7 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
         size="small"
         variant="tonal"
         closable
+        :close-label="`Clear ${filter.label} filter`"
         role="listitem"
         @click:close="clearProjectFilter(filter.key)"
       >

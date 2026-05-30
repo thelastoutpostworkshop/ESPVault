@@ -14,15 +14,18 @@ and no telemetry.
 
 Always include a short commit comment suggestion in the final response.
 
-For browser-based visual checks of the Vue renderer, use the browser harness
-instead of loading the normal Electron entry directly:
+For browser-based visual checks of the Vue renderer, use local Playwright
+against the browser harness. Do not rely on the Codex in-app browser backend
+for this repo's visual testing path.
 
 ```bash
-npm run dev:browser
+npm run test:visual
 ```
 
-Open the printed `browser-harness.html` URL. The harness provides a typed mock
-preload API and seeds sample boards in browser IndexedDB when empty, which lets
+Use `npm run test:visual:headed` when interactive inspection is useful. For
+manual exploratory checks, run `npm run dev:browser` and open the printed
+`browser-harness.html` URL. The harness provides a typed mock preload API and
+seeds sample boards and projects in browser IndexedDB when empty, which lets
 renderer pages be inspected without Electron.
 
 ## UI Style Guidelines

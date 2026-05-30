@@ -9,22 +9,29 @@ npm run dev
 
 ## Browser Visual Checks
 
-Run the browser harness when you need to inspect the Vue renderer outside
-Electron:
+Run the Playwright visual smoke tests against the browser harness:
 
 ```bash
-npm run dev:browser
+npm run test:visual
 ```
 
-Open the printed `browser-harness.html` URL. The harness installs a typed mock
-preload API and seeds sample boards when the browser IndexedDB vault is empty,
-so pages such as Boards have statuses and chip models available for visual
-checks.
+Use `npm run test:visual:headed` for interactive inspection. If Playwright
+browser binaries are missing on a fresh machine, install Chromium once:
+
+```bash
+npx playwright install chromium
+```
+
+For manual exploratory checks, run `npm run dev:browser` and open the printed
+`browser-harness.html` URL. The harness installs a typed mock preload API and
+seeds sample boards and projects when the browser IndexedDB vault is empty, so
+pages such as Boards and Projects have realistic filter data available.
 
 ## Verify
 
 ```bash
 npm run typecheck
+npm run test:visual
 npm run build
 ```
 

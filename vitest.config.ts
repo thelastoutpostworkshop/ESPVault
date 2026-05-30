@@ -10,6 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    exclude: ["tests/visual/**", "node_modules/**", "dist/**", "dist-electron/**"],
     globals: true,
     server: {
       deps: {

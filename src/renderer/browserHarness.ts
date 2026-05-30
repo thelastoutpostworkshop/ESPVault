@@ -1,4 +1,5 @@
 import type { CreateBoardInput } from "../shared/types/board";
+import type { CreateProjectInput } from "../shared/types/inventory";
 import { installBrowserHarnessApi } from "./browserHarnessApi";
 import { repositories } from "./repositories";
 
@@ -9,15 +10,30 @@ void seedBrowserHarnessData().finally(() => {
 });
 
 async function seedBrowserHarnessData(): Promise<void> {
-  const existingBoards = await repositories.boards.list();
+  const [existingBoards, existingProjects] = await Promise.all([
+    repositories.boards.list(),
+    repositories.projects.list()
+  ]);
+  let projectIds = existingProjects.map((project) => project.id);
 
-  if (existingBoards.length) {
-    return;
+  if (!existingProjects.length) {
+    const createdProjects = await Promise.all(
+      sampleProjects.map((project) => repositories.projects.create(project))
+    );
+    projectIds = createdProjects.map((project) => project.id);
   }
 
-  await Promise.all(
-    sampleBoards.map((board) => repositories.boards.create(board))
-  );
+  if (!existingBoards.length) {
+    await Promise.all(
+      sampleBoards.map((board, index) =>
+        repositories.boards.create(
+          index === 1 && projectIds[0]
+            ? { ...board, projectId: projectIds[0] }
+            : board
+        )
+      )
+    );
+  }
 }
 
 const sampleBoards: CreateBoardInput[] = [
@@ -66,5 +82,26 @@ const sampleBoards: CreateBoardInput[] = [
     manufacturer: "Espressif",
     physicalLocation: "Repair tray",
     notes: "Seeded so filter menus have multiple chip models and statuses."
+  }
+];
+
+const sampleProjects: CreateProjectInput[] = [
+  {
+    name: "Garage Monitor",
+    description: "Installed monitor project for environmental readings.",
+    location: "Garage workbench",
+    status: "active"
+  },
+  {
+    name: "Greenhouse Controller",
+    description: "Repair queue project for relay and enclosure checks.",
+    location: "Greenhouse shelf",
+    status: "needs_repair"
+  },
+  {
+    name: "Retired Weather Node",
+    description: "Archived outdoor sensor build.",
+    location: "Archive bin",
+    status: "archived"
   }
 ];

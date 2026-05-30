@@ -657,6 +657,7 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
         size="small"
         variant="tonal"
         closable
+        :close-label="`Clear ${filter.label} filter`"
         role="listitem"
         @click:close="clearBoardFilter(filter.key)"
       >
