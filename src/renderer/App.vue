@@ -11,8 +11,6 @@ import ProjectsPage from "./pages/ProjectsPage.vue";
 import ScanBoardPage from "./pages/ScanBoardPage.vue";
 import SettingsPage from "./pages/SettingsPage.vue";
 import ToolsPage from "./pages/ToolsPage.vue";
-import darkBrandLogo from "./assets/esp-board-vault-logo-dark.png";
-import lightBrandLogo from "./assets/esp-board-vault-logo-light.png";
 import { useVaultTheme } from "./composables/useVaultTheme";
 import {
   getBackupReminder,
@@ -131,9 +129,6 @@ const themeToggleIcon = computed(() =>
 );
 const themeToggleLabel = computed(() =>
   isDarkTheme.value ? "Switch to light mode" : "Switch to dark mode"
-);
-const brandLogo = computed(() =>
-  isDarkTheme.value ? darkBrandLogo : lightBrandLogo
 );
 const isTemporaryNavigation = computed(() => viewportWidth.value < 960);
 const isRailNavigation = computed(
@@ -366,12 +361,19 @@ function closeTemporaryNavigation(): void {
       :rail-width="78"
       width="264"
     >
-      <div class="brand-block px-5 py-5">
-        <img
-          class="brand-logo"
-          :src="brandLogo"
-          alt="ESP Board Vault"
-        >
+      <div class="brand-block px-4 py-4">
+        <div class="brand-lockup" aria-label="ESP Board Vault">
+          <div class="brand-mark" aria-hidden="true">
+            <v-icon class="brand-mark-board" icon="mdi-developer-board" size="30" />
+            <span class="brand-mark-lock">
+              <v-icon icon="mdi-lock-outline" size="15" />
+            </span>
+          </div>
+          <div class="brand-copy">
+            <span>ESP Board</span>
+            <strong>Vault</strong>
+          </div>
+        </div>
       </div>
 
       <v-divider />
@@ -605,17 +607,95 @@ function closeTemporaryNavigation(): void {
 
 .brand-block {
   display: grid;
-  min-height: 86px;
+  min-height: 82px;
   align-items: center;
 }
 
-.brand-logo {
-  display: block;
-  width: 100%;
-  max-height: 70px;
-  object-fit: contain;
-  object-position: left center;
-  filter: drop-shadow(0 10px 24px rgba(var(--v-theme-primary), 0.14));
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-mark {
+  position: relative;
+  display: grid;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(var(--v-theme-primary), 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.16), rgba(var(--v-theme-accent), 0.1)),
+    rgba(var(--v-theme-surface), 0.58);
+  box-shadow: 0 10px 22px rgba(var(--v-theme-primary), 0.12);
+  color: rgb(var(--v-theme-primary));
+}
+
+.brand-mark::before,
+.brand-mark::after {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: rgba(var(--v-theme-primary), 0.34);
+  content: "";
+}
+
+.brand-mark::before {
+  top: 9px;
+}
+
+.brand-mark::after {
+  bottom: 9px;
+}
+
+.brand-mark-board {
+  filter: drop-shadow(0 5px 12px rgba(var(--v-theme-primary), 0.2));
+}
+
+.brand-mark-lock {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid rgba(var(--v-theme-primary), 0.32);
+  border-radius: 8px;
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-primary));
+}
+
+.brand-copy {
+  display: grid;
+  min-width: 0;
+  line-height: 1;
+}
+
+.brand-copy span {
+  color: var(--vault-text);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.brand-copy strong {
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgb(var(--v-theme-primary)), rgb(var(--v-theme-accent)));
+  background-clip: text;
+  color: rgb(var(--v-theme-primary));
+  font-size: 1.55rem;
+  font-weight: 900;
+  line-height: 1.04;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .vault-drawer--rail .brand-block {
@@ -623,9 +703,18 @@ function closeTemporaryNavigation(): void {
   padding-inline: 10px !important;
 }
 
-.vault-drawer--rail .brand-logo {
-  max-height: 42px;
-  object-position: center center;
+.vault-drawer--rail .brand-lockup {
+  justify-content: center;
+}
+
+.vault-drawer--rail .brand-copy {
+  display: none;
+}
+
+.vault-drawer--rail .brand-mark {
+  flex-basis: 44px;
+  width: 44px;
+  height: 44px;
 }
 
 .vault-drawer--rail .nav-list {
@@ -636,10 +725,6 @@ function closeTemporaryNavigation(): void {
 .vault-drawer--rail :deep(.v-list-item__append),
 .vault-drawer--rail .nav-version-block {
   display: none;
-}
-
-.vault-drawer--temporary .brand-logo {
-  object-position: left center;
 }
 
 .nav-list :deep(.v-list-item) {
