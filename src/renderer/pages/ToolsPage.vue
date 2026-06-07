@@ -11,6 +11,7 @@ interface ToolItem {
   actionLabel?: string;
   sourceUrl?: string;
   sourceLabel?: string;
+  tutorialUrl?: string;
 }
 
 const error = ref<string | null>(null);
@@ -24,7 +25,8 @@ const toolItems: ToolItem[] = [
     description:
       "ESPConnect is a browser-based utility for working with ESP devices over a serial connection. It is useful when you need a quick way to connect, inspect, and interact with a board without setting up a full local toolchain first. Keep it nearby for maker bench workflows where fast device access matters.",
     sourceUrl: "https://github.com/thelastoutpostworkshop/ESPConnect",
-    sourceLabel: "thelastoutpostworkshop/ESPConnect"
+    sourceLabel: "thelastoutpostworkshop/ESPConnect",
+    tutorialUrl: "https://www.youtube.com/watch?v=-nhDKzBxHiI"
   },
   {
     key: "partition-builder",
@@ -34,7 +36,8 @@ const toolItems: ToolItem[] = [
     description:
       "ESP32 Partition Builder helps plan and review ESP32 flash partition layouts for firmware projects. Use it when a project needs a clear split between app slots, storage, OTA space, SPIFFS, LittleFS, or other data regions. It is a practical companion when documenting how a board is configured and how firmware should be reproduced later.",
     sourceUrl: "https://github.com/thelastoutpostworkshop/ESP32PartitionBuilder",
-    sourceLabel: "thelastoutpostworkshop/ESP32PartitionBuilder"
+    sourceLabel: "thelastoutpostworkshop/ESP32PartitionBuilder",
+    tutorialUrl: "https://www.youtube.com/watch?v=EuHxodrye6E"
   },
   {
     key: "video-conversion",
@@ -44,7 +47,8 @@ const toolItems: ToolItem[] = [
     description:
       "Video Conversion Studio converts video assets for embedded displays, maker interfaces, and web-friendly output formats. It is useful when preparing media for ESP32 display projects, dashboard demos, or device UI experiments where resolution, format, and file size need to be controlled. Use it as a focused workspace for turning source video into project-ready assets.",
     sourceUrl: "https://github.com/thelastoutpostworkshop/video_conversion",
-    sourceLabel: "thelastoutpostworkshop/video_conversion"
+    sourceLabel: "thelastoutpostworkshop/video_conversion",
+    tutorialUrl: "https://www.youtube.com/watch?v=bFq05qXqin0"
   },
   {
     key: "gpio-viewer",
@@ -65,7 +69,8 @@ const toolItems: ToolItem[] = [
     url: "https://marketplace.visualstudio.com/items?itemName=TheLastOutpostWorkshop.arduino-maker-workshop",
     description:
       "Arduino Maker Workshop is a VS Code extension for Arduino-centered maker development. It gives makers a more focused editor workflow for sketch-driven projects, board-oriented iteration, and workshop-style development. It belongs here as a companion tool for moving from inventory notes into hands-on firmware work.",
-    sourceLabel: "VS Code Marketplace extension"
+    sourceLabel: "VS Code Marketplace extension",
+    tutorialUrl: "https://www.youtube.com/watch?v=rduTUUVkzqM"
   }
 ];
 
@@ -127,6 +132,15 @@ async function openExternal(url: string): Promise<void> {
         </v-card-text>
         <v-divider />
         <v-card-actions>
+          <v-btn
+            v-if="tool.tutorialUrl"
+            color="primary"
+            prepend-icon="mdi-youtube"
+            variant="text"
+            @click="openExternal(tool.tutorialUrl)"
+          >
+            Watch tutorial
+          </v-btn>
           <v-spacer />
           <v-btn
             color="primary"
