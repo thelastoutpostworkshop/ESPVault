@@ -61,7 +61,7 @@ the typed preload API, not direct renderer Node.js or raw IPC.
 
 ## Technical Stack
 
-Use Electron, Vue 3, TypeScript, Vite, Vuetify 3, Pinia, Dexie, and
+Use Electron, Vue 3, TypeScript, Vite, Vuetify 4, Pinia, Dexie, and
 IndexedDB. Use `tasmota-webserial-esptool` for ESP board scanning through Web
 Serial.
 https://github.com/Jason2866/WebSerial_ESPTool/tree/development
