@@ -16,6 +16,12 @@ import {
   getBackupReminder,
   getBackupStatus
 } from "./services/backupStatus";
+import {
+  deferSupportReminder,
+  disableSupportReminder,
+  recordSupportReminderEvent,
+  type SupportReminderTrigger
+} from "./services/supportReminder";
 import type { StartupIntegrityIssue } from "./services/startupIntegrity";
 import { useBoardStore } from "./stores/boardStore";
 import { PROJECT_STATUS_LABELS, useProjectStore } from "./stores/projectStore";
@@ -63,6 +69,9 @@ const searchSelection = ref<SearchItem | null>(null);
 const searchQuery = ref("");
 const startupBackupReminderMessage = ref("");
 const startupBackupReminderSnackbar = ref(false);
+const supportReminderMessage = ref("");
+const supportReminderUrl = ref("");
+const supportReminderSnackbar = ref(false);
 const appVersion = ref<string | null>(null);
 const viewportWidth = ref(typeof window === "undefined" ? 1280 : window.innerWidth);
 const { isDarkTheme, toggleTheme } = useVaultTheme();
@@ -137,6 +146,7 @@ const isRailNavigation = computed(
 const drawerOpen = ref(!isTemporaryNavigation.value);
 const appBarBusy = computed(() => boardsLoading.value || projectsLoading.value);
 const startupIntegrityIssue = computed(() => props.startupIntegrityIssue ?? null);
+const initialDataLoaded = ref(false);
 const searchItems = computed<SearchItem[]>(() => [
   ...boards.value.map((board) => ({
     id: board.id,
@@ -206,11 +216,16 @@ function updateViewportWidth(): void {
 }
 
 function navigateToView(view: ViewKey): void {
+  if (currentView.value !== view) {
+    recordMeaningfulUse();
+  }
+
   currentView.value = view;
   closeTemporaryNavigation();
 }
 
 function openBoards(): void {
+  recordMeaningfulUse();
   boardToOpenId.value = null;
   projectToOpenId.value = null;
   currentView.value = "boards";
@@ -218,6 +233,7 @@ function openBoards(): void {
 }
 
 function openScan(): void {
+  recordMeaningfulUse();
   boardToOpenId.value = null;
   projectToOpenId.value = null;
   currentView.value = "scan";
@@ -225,6 +241,7 @@ function openScan(): void {
 }
 
 function scanBoards(): void {
+  recordMeaningfulUse();
   boardToOpenId.value = null;
   projectToOpenId.value = null;
   scanRequestId.value += 1;
@@ -233,6 +250,7 @@ function scanBoards(): void {
 }
 
 function openBoard(id: string): void {
+  recordMeaningfulUse();
   boardToOpenId.value = id;
   projectToOpenId.value = null;
   currentView.value = "boards";
@@ -240,6 +258,7 @@ function openBoard(id: string): void {
 }
 
 function openProject(id: string): void {
+  recordMeaningfulUse();
   boardToOpenId.value = null;
   projectToOpenId.value = id;
   currentView.value = "projects";
@@ -263,6 +282,12 @@ function selectSearchResult(item: SearchItem | null): void {
 
 async function refreshAppData(): Promise<void> {
   await Promise.all([boardStore.refresh(), projectStore.loadProjects()]);
+
+  if (initialDataLoaded.value) {
+    recordMeaningfulUse();
+  } else {
+    initialDataLoaded.value = true;
+  }
 }
 
 async function loadAppVersion(): Promise<void> {
@@ -326,6 +351,72 @@ function openResource(item: ResourceItem): void {
   closeTemporaryNavigation();
   void window.api.shell.openExternal(item.url).catch((caughtError: unknown) => {
     console.error("Resource link could not be opened.", caughtError);
+  });
+}
+
+function recordMeaningfulUse(): void {
+  if (!initialDataLoaded.value) {
+    return;
+  }
+
+  void maybeShowSupportReminder("meaningful-use");
+}
+
+function handleScanSuccess(): void {
+  void maybeShowSupportReminder("successful-scan");
+}
+
+async function maybeShowSupportReminder(
+  trigger: SupportReminderTrigger
+): Promise<void> {
+  if (
+    supportReminderSnackbar.value ||
+    startupBackupReminderSnackbar.value ||
+    startupIntegrityIssue.value
+  ) {
+    return;
+  }
+
+  try {
+    const prompt = await recordSupportReminderEvent(trigger);
+
+    if (!prompt) {
+      return;
+    }
+
+    supportReminderMessage.value = prompt.message;
+    supportReminderUrl.value = prompt.url;
+    supportReminderSnackbar.value = true;
+  } catch (caughtError) {
+    console.error("Support reminder could not be updated.", caughtError);
+  }
+}
+
+function openSupportFromReminder(): void {
+  supportReminderSnackbar.value = false;
+
+  if (!supportReminderUrl.value) {
+    return;
+  }
+
+  void window.api.shell.openExternal(supportReminderUrl.value).catch(
+    (caughtError: unknown) => {
+      console.error("Support link could not be opened.", caughtError);
+    }
+  );
+}
+
+function remindSupportLater(): void {
+  supportReminderSnackbar.value = false;
+  void deferSupportReminder().catch((caughtError: unknown) => {
+    console.error("Support reminder could not be deferred.", caughtError);
+  });
+}
+
+function turnOffSupportReminder(): void {
+  supportReminderSnackbar.value = false;
+  void disableSupportReminder().catch((caughtError: unknown) => {
+    console.error("Support reminder could not be disabled.", caughtError);
   });
 }
 
@@ -564,6 +655,7 @@ function closeTemporaryNavigation(): void {
         @scan-boards="scanBoards"
         @open-board="openBoard"
         @open-project="openProject"
+        @scan-success="handleScanSuccess"
       />
     </v-main>
 
@@ -586,6 +678,35 @@ function closeTemporaryNavigation(): void {
           @click="startupBackupReminderSnackbar = false"
         >
           Dismiss
+        </v-btn>
+      </template>
+    </v-snackbar>
+
+    <v-snackbar
+      v-model="supportReminderSnackbar"
+      color="primary"
+      location="bottom right"
+      timeout="-1"
+    >
+      {{ supportReminderMessage }}
+      <template #actions>
+        <v-btn
+          variant="text"
+          @click="openSupportFromReminder"
+        >
+          Buy me a coffee
+        </v-btn>
+        <v-btn
+          variant="text"
+          @click="remindSupportLater"
+        >
+          Remind me later
+        </v-btn>
+        <v-btn
+          variant="text"
+          @click="turnOffSupportReminder"
+        >
+          Don't show again
         </v-btn>
       </template>
     </v-snackbar>

@@ -207,6 +207,29 @@ async function openExternalLink(url: string, fallbackMessage: string): Promise<v
         </v-list>
       </v-card>
 
+      <v-card class="panel-card support-card" flat>
+        <v-card-text class="support-card-body">
+          <div class="support-icon" aria-hidden="true">
+            <v-icon icon="mdi-coffee-outline" size="30" />
+          </div>
+          <div class="support-copy">
+            <div class="support-title">Support the project</div>
+            <p>
+              ESP Board Vault is free, local-first, and built for maker bench
+              workflows. If it saves time in your ESP32 projects, a coffee helps
+              keep development moving.
+            </p>
+          </div>
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-coffee-outline"
+            @click="openCoffeeLink"
+          >
+            Buy me a coffee
+          </v-btn>
+        </v-card-text>
+      </v-card>
+
       <v-card class="panel-card about-wide-card" flat>
         <v-card-title class="text-subtitle-1 font-weight-bold">
           <v-icon class="mr-2" color="primary" icon="mdi-usb-port" />
@@ -315,6 +338,41 @@ async function openExternalLink(url: string, fallbackMessage: string): Promise<v
   grid-column: 1 / -1;
 }
 
+.support-card-body {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.support-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid rgba(var(--v-theme-accent), 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(var(--v-theme-accent), 0.18), rgba(var(--v-theme-primary), 0.1)),
+    rgba(var(--v-theme-surface), 0.76);
+  color: rgb(var(--v-theme-accent));
+}
+
+.support-copy {
+  min-width: 0;
+}
+
+.support-title {
+  color: var(--vault-text);
+  font-weight: 800;
+}
+
+.support-copy p {
+  margin: 6px 0 0;
+  color: var(--vault-muted);
+  line-height: 1.5;
+}
+
 .about-note-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -331,6 +389,10 @@ async function openExternalLink(url: string, fallbackMessage: string): Promise<v
   }
 
   .about-note-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .support-card-body {
     grid-template-columns: 1fr;
   }
 }
