@@ -15,6 +15,7 @@ interface ToolItem {
 }
 
 const error = ref<string | null>(null);
+const coffeeUrl = "https://buymeacoffee.com/thelastoutpostworkshop";
 
 const toolItems: ToolItem[] = [
   {
@@ -103,6 +104,28 @@ async function openExternal(url: string): Promise<void> {
       {{ error }}
     </v-alert>
 
+    <v-card class="panel-card tools-support-card" flat>
+      <v-card-text class="tools-support-body">
+        <div class="tools-support-icon" aria-hidden="true">
+          <v-icon icon="mdi-coffee-outline" size="28" />
+        </div>
+        <div class="tools-support-copy">
+          <div class="tools-support-title">Support the project</div>
+          <p>
+            These maker utilities and ESP Board Vault are free to use. If they
+            help at your bench, a coffee supports ongoing development.
+          </p>
+        </div>
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-coffee-outline"
+          @click="openExternal(coffeeUrl)"
+        >
+          Buy me a coffee
+        </v-btn>
+      </v-card-text>
+    </v-card>
+
     <div class="tools-grid">
       <v-card
         v-for="tool in toolItems"
@@ -156,6 +179,45 @@ async function openExternal(url: string): Promise<void> {
 </template>
 
 <style scoped>
+.tools-support-card {
+  margin-bottom: 16px;
+}
+
+.tools-support-body {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.tools-support-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid rgba(var(--v-theme-accent), 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(var(--v-theme-accent), 0.18), rgba(var(--v-theme-primary), 0.1)),
+    rgba(var(--v-theme-surface), 0.76);
+  color: rgb(var(--v-theme-accent));
+}
+
+.tools-support-copy {
+  min-width: 0;
+}
+
+.tools-support-title {
+  color: var(--vault-text);
+  font-weight: 800;
+}
+
+.tools-support-copy p {
+  margin: 6px 0 0;
+  color: var(--vault-muted);
+  line-height: 1.5;
+}
+
 .tools-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -231,6 +293,10 @@ async function openExternal(url: string): Promise<void> {
 }
 
 @media (max-width: 560px) {
+  .tools-support-body {
+    grid-template-columns: 1fr;
+  }
+
   .tool-card-body {
     grid-template-columns: 1fr;
   }
