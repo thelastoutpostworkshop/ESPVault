@@ -4,7 +4,7 @@ import { onMounted, ref } from "vue";
 const channelUrl =
   "https://www.youtube.com/channel/UCnnU_HGvTr8ewpqvHe2llDw";
 const repositoryUrl =
-  "https://github.com/thelastoutpostworkshop/ESP-Board-Vault";
+  "https://github.com/thelastoutpostworkshop/ESPVault";
 const coffeeUrl = "https://buymeacoffee.com/thelastoutpostworkshop";
 const error = ref<string | null>(null);
 const appVersion = ref<string | null>(null);
