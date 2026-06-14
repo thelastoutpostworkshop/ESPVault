@@ -89,12 +89,14 @@ jobs:
       - name: Create or update release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release upload "$TAG_NAME" release-artifacts/* --clobber
+          if gh release view "$TAG_NAME" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" release-artifacts/* --repo "$GH_REPO" --clobber
           else
             gh release create "$TAG_NAME" release-artifacts/* \
+              --repo "$GH_REPO" \
               --title "ESP Board Vault $TAG_NAME" \
               --generate-notes
           fi
