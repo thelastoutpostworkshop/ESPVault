@@ -1,5 +1,7 @@
 # ESP Board Vault
 
+[![ESP Board Vault banner](https://raw.githubusercontent.com/thelastoutpostworkshop/images/main/ESPBoardVaultBanner.png)](https://youtu.be/YwYP-eET9Oo)
+
 ESP Board Vault is a local desktop inventory for ESP32 makers. It helps you keep
 track of ESP boards, hardware details, projects, firmware notes, physical
 locations, and recovery information without using a cloud service.
