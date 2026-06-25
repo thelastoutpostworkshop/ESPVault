@@ -2,7 +2,16 @@
 
 All notable changes to ESP Board Vault are documented in this file.
 
-## 1.0.26 - Unreleased
+## 1.0.27 - Unreleased
+
+### Changed
+
+- Recommend the macOS arm64 ZIP as the Apple Silicon download while DMG
+  generation is under investigation.
+- Validate macOS DMG artifacts in CI before uploading release assets, and omit a
+  failing arm64 DMG while keeping the working arm64 ZIP available.
+
+## 1.0.26 - 2026-06-25
 
 ### Fixed
 

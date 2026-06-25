@@ -59,6 +59,47 @@ jobs:
       - name: Package desktop app
         run: npm run package -- --${{ matrix.platform }} --${{ matrix.arch }}
 
+      - name: Validate macOS DMG artifacts
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          dmgs=(release/*.dmg)
+
+          if [ "${#dmgs[@]}" -eq 0 ]; then
+            echo "::warning::No macOS DMG artifacts were produced."
+            exit 0
+          fi
+
+          for dmg in "${dmgs[@]}"; do
+            echo "Validating ${dmg}"
+
+            if hdiutil verify "${dmg}" && attach_output="$(hdiutil attach -readonly -nobrowse -noautoopen "${dmg}" 2>&1)"; then
+              echo "${attach_output}"
+              devices="$(printf '%s\n' "${attach_output}" | awk '/^\/dev\// { print $1 }')"
+
+              while IFS= read -r device; do
+                if [ -n "${device}" ]; then
+                  hdiutil detach "${device}" -quiet || true
+                fi
+              done <<< "${devices}"
+
+              continue
+            fi
+
+            echo "::error::DMG validation failed for ${dmg}"
+
+            if [ "${{ matrix.arch }}" = "arm64" ]; then
+              echo "::warning::Removing invalid arm64 DMG from release artifacts. The macOS arm64 ZIP remains available."
+              rm -f "${dmg}" "${dmg}.blockmap"
+              continue
+            fi
+
+            exit 1
+          done
+
       - name: Upload packaged app
         uses: actions/upload-artifact@v6
         with:
