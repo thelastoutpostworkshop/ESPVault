@@ -71,6 +71,7 @@ const MIN_WINDOW_SIZE: WindowSize = {
   width: 980,
   height: 680
 };
+const LINUX_DESKTOP_NAME = "esp-board-vault.desktop";
 
 let lastSerialPortSelection: SerialPortSelection = createEmptySerialPortSelection();
 let mainWindow: BrowserWindow | null = null;
@@ -117,6 +118,9 @@ interface CoverImageFilePayload {
 }
 
 app.setName(isDevelopment ? "ESP Board Vault Dev" : "ESP Board Vault");
+if (process.platform === "linux") {
+  app.setDesktopName(LINUX_DESKTOP_NAME);
+}
 applyConfiguredUserDataPath();
 
 ipcMain.handle(APP_GET_VERSION_CHANNEL, () => app.getVersion());
@@ -338,6 +342,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: MIN_WINDOW_SIZE.height,
     autoHideMenuBar: true,
     title: app.getName(),
+    icon: getLinuxWindowIconPath(),
     backgroundColor: "#f7f8f5",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -359,6 +364,18 @@ function createMainWindow(): BrowserWindow {
   }
 
   return window;
+}
+
+function getLinuxWindowIconPath(): string | undefined {
+  if (process.platform !== "linux") {
+    return undefined;
+  }
+
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, "icon.png")
+    : path.join(__dirname, "..", "build", "icon.png");
+
+  return existsSync(iconPath) ? iconPath : undefined;
 }
 
 function persistWindowSizeChanges(window: BrowserWindow): void {
@@ -1816,6 +1833,7 @@ async function showSerialPortPicker<TPort extends SelectableSerialPort>(
       parent: window,
       modal: true,
       title: "Select ESP Boards",
+      icon: getLinuxWindowIconPath(),
       backgroundColor: "#f7f8f5",
       show: false,
       minimizable: false,

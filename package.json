@@ -1,5 +1,6 @@
 {
   "name": "esp-board-vault",
+  "desktopName": "esp-board-vault.desktop",
   "version": "1.0.28",
   "description": "A local-first desktop notebook for ESP32 board inventory.",
   "author": "The Last Outpost Workshop",

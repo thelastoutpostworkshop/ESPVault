@@ -11,6 +11,10 @@ files:
   - dist-electron/**
   - package.json
 
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+
 asar: true
 npmRebuild: false
 afterPack: scripts/after-pack-icons.cjs
@@ -54,8 +58,9 @@ dmg:
 linux:
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
   category: Development
-  icon: icon.png
+  icon: icons/linux
   maintainer: The Last Outpost Workshop <noreply@github.com>
+  syncDesktopName: true
   target:
     - target: AppImage
       arch:
