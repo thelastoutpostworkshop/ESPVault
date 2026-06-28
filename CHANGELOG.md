@@ -2,6 +2,12 @@
 
 All notable changes to ESP Board Vault are documented in this file.
 
+## 1.0.29
+
+### Fixed
+
+- Fixed missing Linux desktop panel icons ([#5](https://github.com/thelastoutpostworkshop/ESPVault/issues/5)).
+
 ## 1.0.28
 
 ### Fixed
