@@ -2,6 +2,13 @@
 
 All notable changes to ESP Board Vault are documented in this file.
 
+## 1.0.30
+
+### Fixed
+
+- Actually hide legacy Linux `/dev/ttyS*` rows in the serial picker instead of
+  only clearing their selection ([#6](https://github.com/thelastoutpostworkshop/ESPVault/issues/6)).
+
 ## 1.0.29
 
 ### Fixed

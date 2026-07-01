@@ -2001,6 +2001,7 @@ function renderSerialPortPickerHtml(ports: SelectableSerialPort[]): string {
       background: #ffffff;
       cursor: pointer;
     }
+    .port-row[hidden] { display: none !important; }
     .port-row:hover { border-color: #8d9a82; }
     .port-checkbox {
       width: 18px;
