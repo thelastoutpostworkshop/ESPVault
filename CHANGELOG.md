@@ -4,6 +4,10 @@ All notable changes to ESP Board Vault are documented in this file.
 
 ## 1.0.31
 
+### Changed
+
+- Updated Electron to 43.1.0 for the Chromium 150 runtime update.
+
 ### Fixed
 
 - Prevent ESP32 scans from hanging when Web Serial cleanup stalls after a
