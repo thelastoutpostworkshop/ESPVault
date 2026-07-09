@@ -2,6 +2,14 @@
 
 All notable changes to ESP Board Vault are documented in this file.
 
+## 1.0.31
+
+### Fixed
+
+- Prevent ESP32 scans from hanging when Web Serial cleanup stalls after a
+  successful scan, preserving detected board data and logging a recovery note
+  ([#7](https://github.com/thelastoutpostworkshop/ESPVault/issues/7)).
+
 ## 1.0.30
 
 ### Fixed

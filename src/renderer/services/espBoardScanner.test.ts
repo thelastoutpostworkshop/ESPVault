@@ -24,6 +24,7 @@ const ESP32S3_MAC_EFUSE_REG = ESP32S3_EFUSE_BASE + 0x044;
 const ESP32S3_EFUSE_BLOCK1_ADDR = ESP32S3_EFUSE_BASE + 0x044;
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
@@ -174,6 +175,55 @@ describe("ESP board scanner", () => {
     );
 
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("returns scan data when serial disconnect cleanup stalls", async () => {
+    vi.useFakeTimers();
+
+    const port = { id: "port-a" };
+    const requestPort = vi.fn().mockResolvedValueOnce(port);
+    const { bootloaderLoader, scanLoader } = createSuccessfulLoader();
+    const logs: string[] = [];
+    let resolveDisconnectStarted: () => void = () => undefined;
+    const disconnectStarted = new Promise<void>((resolve) => {
+      resolveDisconnectStarted = resolve;
+    });
+    const disconnect = vi.fn(() => {
+      resolveDisconnectStarted();
+      return new Promise<void>(() => undefined);
+    });
+
+    scanLoader.disconnect = disconnect;
+    vi.stubGlobal("navigator", {
+      serial: { requestPort }
+    });
+    vi.stubGlobal("window", {
+      api: {
+        serial: {
+          getLastSelection: vi.fn(async () => ({
+            availableCount: 1,
+            selectedCount: 1,
+            selectedPorts: [{ usbProductId: null, usbVendorId: null }]
+          })),
+          getLastSelectionCount: vi.fn(async () => 1)
+        }
+      }
+    });
+    connectWithPortMock.mockResolvedValueOnce(bootloaderLoader);
+
+    const scanPromise = scanEspBoards((level, message) => {
+      logs.push(`${level}:${message}`);
+    });
+    await disconnectStarted;
+    await vi.advanceTimersByTimeAsync(3000);
+
+    const boards = await scanPromise;
+
+    expect(boards).toHaveLength(1);
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(logs).toContain(
+      "error:Serial port cleanup timed out after 3 seconds; scan data was retained. If the port remains busy, unplug and reconnect the board."
+    );
   });
 });
 
