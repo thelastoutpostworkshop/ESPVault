@@ -20,6 +20,7 @@ export interface EspBoardVaultApi {
   };
   boardImages: {
     chooseCover(boardId: string): Promise<CoverImageResult>;
+    chooseSecondary(boardId: string): Promise<CoverImageResult>;
     copyCoverFromFile(
       boardId: string,
       file: CoverImageFileInput

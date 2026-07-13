@@ -94,7 +94,9 @@ const boardCoverError = ref<string | null>(null);
 const boardCoverBusyId = ref<string | null>(null);
 const boardCoverDragActiveId = ref<string | null>(null);
 const boardCoverViewerOpen = ref(false);
+const boardSecondaryImageViewerOpen = ref(false);
 const boardThumbnailUrls = ref<Record<string, string | null>>({});
+const boardSecondaryImageUrls = ref<Record<string, string | null>>({});
 const partitionBuilderError = ref<string | null>(null);
 let boardThumbnailLoadToken = 0;
 
@@ -217,7 +219,10 @@ const selectedPartitionSegments = computed(() =>
 
 const boardCoverPathKey = computed(() =>
   boards.value
-    .map((board) => `${board.id}:${board.coverImagePath ?? ""}`)
+    .map(
+      (board) =>
+        `${board.id}:${board.coverImagePath ?? ""}:${board.secondaryImagePath ?? ""}`
+    )
     .join("|")
 );
 
@@ -433,11 +438,17 @@ async function confirmDelete(): Promise<void> {
   }
 
   const coverImagePath = deletingBoard.value.coverImagePath;
+  const secondaryImagePath = deletingBoard.value.secondaryImagePath;
   const deletedBoardId = deletingBoard.value.id;
   await boardStore.deleteBoard(deletingBoard.value.id);
 
   if (coverImagePath) {
     await window.api.boardImages.deleteCover(coverImagePath).catch(() => {
+      // The board record is gone. A stale old image file is non-blocking.
+    });
+  }
+  if (secondaryImagePath) {
+    await window.api.boardImages.deleteCover(secondaryImagePath).catch(() => {
       // The board record is gone. A stale old image file is non-blocking.
     });
   }
@@ -452,25 +463,144 @@ async function confirmDelete(): Promise<void> {
 async function loadBoardCoverThumbnails(boardList: Board[]): Promise<void> {
   const token = ++boardThumbnailLoadToken;
   const nextThumbnails: Record<string, string | null> = {};
+  const nextSecondaryImages: Record<string, string | null> = {};
 
   await Promise.all(
     boardList.map(async (board) => {
       if (!board.coverImagePath) {
         nextThumbnails[board.id] = null;
-        return;
+      } else {
+        try {
+          nextThumbnails[board.id] =
+            await window.api.boardImages.readCoverDataUrl(board.coverImagePath);
+        } catch {
+          nextThumbnails[board.id] = null;
+        }
       }
 
-      try {
-        nextThumbnails[board.id] =
-          await window.api.boardImages.readCoverDataUrl(board.coverImagePath);
-      } catch {
-        nextThumbnails[board.id] = null;
+      if (!board.secondaryImagePath) {
+        nextSecondaryImages[board.id] = null;
+      } else {
+        try {
+          nextSecondaryImages[board.id] =
+            await window.api.boardImages.readCoverDataUrl(board.secondaryImagePath);
+        } catch {
+          nextSecondaryImages[board.id] = null;
+        }
       }
     })
   );
 
   if (token === boardThumbnailLoadToken) {
     boardThumbnailUrls.value = nextThumbnails;
+    boardSecondaryImageUrls.value = nextSecondaryImages;
+  }
+}
+
+async function chooseBoardSecondaryImage(board: Board): Promise<void> {
+  await applyBoardSecondaryImage(board, () =>
+    window.api.boardImages.chooseSecondary(board.id)
+  );
+}
+
+async function dropBoardSecondaryImage(board: Board, file: File): Promise<void> {
+  await applyBoardSecondaryImage(board, () =>
+    readCoverImageFile(file).then((imageFile) =>
+      window.api.boardImages.copyCoverFromFile(board.id, imageFile)
+    )
+  );
+}
+
+async function applyBoardSecondaryImage(
+  board: Board,
+  copyImage: () => Promise<CoverImageResult>
+): Promise<void> {
+  if (boardCoverBusyId.value) {
+    return;
+  }
+
+  boardCoverError.value = null;
+  boardCoverBusyId.value = board.id;
+  const previousPath = board.secondaryImagePath;
+  let copiedPath: string | null = null;
+
+  try {
+    const result = await copyImage();
+
+    if (result.canceled || !result.localPath) {
+      return;
+    }
+
+    copiedPath = result.localPath;
+    await boardStore.updateBoard(board.id, {
+      secondaryImagePath: result.localPath,
+      secondaryImageFilename: result.filename ?? null,
+      secondaryImageMimeType: result.mimeType ?? null,
+      secondaryImageSizeBytes: result.sizeBytes ?? null
+    });
+    boardSecondaryImageUrls.value = {
+      ...boardSecondaryImageUrls.value,
+      [board.id]:
+        result.dataUrl ??
+        (await window.api.boardImages.readCoverDataUrl(result.localPath))
+    };
+
+    if (previousPath && previousPath !== result.localPath) {
+      await window.api.boardImages.deleteCover(previousPath).catch(() => undefined);
+    }
+  } catch (caughtError) {
+    if (copiedPath) {
+      await window.api.boardImages.deleteCover(copiedPath).catch(() => undefined);
+    }
+    boardCoverError.value = getBoardCoverError(
+      caughtError,
+      "The secondary board photo could not be saved."
+    );
+  } finally {
+    boardCoverBusyId.value = null;
+  }
+}
+
+async function dropBoardSecondaryImageFromEvent(
+  board: Board,
+  event: DragEvent
+): Promise<void> {
+  clearBoardCoverDrag(board);
+  const file = getDroppedImageFile(event);
+
+  if (!file) {
+    boardCoverError.value = "Drop a JPG, PNG, WebP, GIF, or BMP image.";
+    return;
+  }
+
+  await dropBoardSecondaryImage(board, file);
+}
+
+async function removeBoardSecondaryImage(board: Board): Promise<void> {
+  if (!board.secondaryImagePath || boardCoverBusyId.value) {
+    return;
+  }
+
+  boardCoverBusyId.value = board.id;
+  boardCoverError.value = null;
+  const imagePath = board.secondaryImagePath;
+
+  try {
+    await boardStore.updateBoard(board.id, {
+      secondaryImagePath: null,
+      secondaryImageFilename: null,
+      secondaryImageMimeType: null,
+      secondaryImageSizeBytes: null
+    });
+    boardSecondaryImageUrls.value = { ...boardSecondaryImageUrls.value, [board.id]: null };
+    await window.api.boardImages.deleteCover(imagePath).catch(() => undefined);
+  } catch (caughtError) {
+    boardCoverError.value = getBoardCoverError(
+      caughtError,
+      "The secondary board photo could not be removed."
+    );
+  } finally {
+    boardCoverBusyId.value = null;
   }
 }
 
@@ -593,6 +723,12 @@ function clearBoardCoverDrag(board: Board): void {
 function openBoardCoverViewer(board: Board): void {
   if (boardThumbnailUrls.value[board.id]) {
     boardCoverViewerOpen.value = true;
+  }
+}
+
+function openBoardSecondaryImageViewer(board: Board): void {
+  if (boardSecondaryImageUrls.value[board.id]) {
+    boardSecondaryImageViewerOpen.value = true;
   }
 }
 
@@ -1058,6 +1194,72 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
             </div>
           </div>
 
+          <div
+            class="board-cover-panel secondary-board-photo-panel cover-drop-target"
+            :class="{
+              'cover-drop-target--active':
+                boardCoverDragActiveId === selectedBoard.id
+            }"
+            @dragenter.prevent="handleBoardCoverDrag(selectedBoard, $event)"
+            @dragover.prevent="handleBoardCoverDrag(selectedBoard, $event)"
+            @dragleave.prevent="clearBoardCoverDrag(selectedBoard)"
+            @drop.prevent.stop="dropBoardSecondaryImageFromEvent(selectedBoard, $event)"
+          >
+            <div class="board-cover-preview">
+              <button
+                v-if="boardSecondaryImageUrls[selectedBoard.id]"
+                class="board-cover-viewer-trigger"
+                type="button"
+                :aria-label="`View ${selectedBoard.secondaryImageFilename || 'secondary board photo'}`"
+                @click="openBoardSecondaryImageViewer(selectedBoard)"
+              >
+                <v-img
+                  :src="boardSecondaryImageUrls[selectedBoard.id] ?? ''"
+                  alt=""
+                  height="150"
+                  cover
+                />
+              </button>
+              <div v-else class="board-cover-placeholder">
+                <v-icon icon="mdi-image-plus-outline" size="34" color="secondary" />
+                <div class="text-caption muted mt-1">No secondary photo</div>
+              </div>
+            </div>
+            <div class="board-cover-body">
+              <div class="section-title">Secondary board photo</div>
+              <div class="text-body-2 mt-1">
+                {{ selectedBoard.secondaryImageFilename || "Add a pinout, underside, wiring, or reference image." }}
+              </div>
+              <div v-if="selectedBoard.secondaryImageSizeBytes !== null" class="text-caption muted mt-1">
+                {{ formatBytes(selectedBoard.secondaryImageSizeBytes) }}
+              </div>
+              <div class="board-cover-actions">
+                <v-btn
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="mdi-image-plus-outline"
+                  :loading="boardCoverBusyId === selectedBoard.id"
+                  @click="chooseBoardSecondaryImage(selectedBoard)"
+                >
+                  {{ selectedBoard.secondaryImagePath ? "Change photo" : "Add photo" }}
+                </v-btn>
+                <v-btn
+                  v-if="selectedBoard.secondaryImagePath"
+                  variant="text"
+                  color="error"
+                  prepend-icon="mdi-image-remove-outline"
+                  :disabled="boardCoverBusyId === selectedBoard.id"
+                  @click="removeBoardSecondaryImage(selectedBoard)"
+                >
+                  Remove
+                </v-btn>
+              </div>
+              <div class="text-caption muted mt-2">
+                Drag an image here to update the secondary board photo.
+              </div>
+            </div>
+          </div>
+
           <div class="board-facts">
             <div>
               <div class="metric-label">Chip</div>
@@ -1363,6 +1565,31 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
             class="cover-viewer-image"
             :src="boardThumbnailUrls[selectedBoard.id] ?? ''"
             :alt="selectedBoard.coverImageFilename || 'Board photo'"
+          >
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="boardSecondaryImageViewerOpen" max-width="96vw">
+      <v-card class="cover-viewer-card">
+        <v-card-title class="cover-viewer-title">
+          <span class="text-subtitle-1 font-weight-bold">
+            {{ selectedBoard?.secondaryImageFilename || "Secondary board photo" }}
+          </span>
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            aria-label="Close secondary board photo"
+            @click="boardSecondaryImageViewerOpen = false"
+          />
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="cover-viewer-body">
+          <img
+            v-if="selectedBoard && boardSecondaryImageUrls[selectedBoard.id]"
+            class="cover-viewer-image"
+            :src="boardSecondaryImageUrls[selectedBoard.id] ?? ''"
+            :alt="selectedBoard.secondaryImageFilename || 'Secondary board photo'"
           >
         </v-card-text>
       </v-card>

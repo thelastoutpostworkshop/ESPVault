@@ -57,6 +57,7 @@ const BACKUP_OPEN_CHANNEL = "backup:open";
 const BACKUP_RESTORE_FILES_CHANNEL = "backup:restore-files";
 const SHELL_OPEN_EXTERNAL_CHANNEL = "shell:open-external";
 const BOARD_IMAGE_CHOOSE_COVER_CHANNEL = "board-image:choose-cover";
+const BOARD_IMAGE_CHOOSE_SECONDARY_CHANNEL = "board-image:choose-secondary";
 const BOARD_IMAGE_COPY_COVER_CHANNEL = "board-image:copy-cover";
 const BOARD_IMAGE_DELETE_COVER_CHANNEL = "board-image:delete-cover";
 const BOARD_IMAGE_READ_COVER_DATA_URL_CHANNEL = "board-image:read-cover-data-url";
@@ -264,6 +265,26 @@ ipcMain.handle(BOARD_IMAGE_CHOOSE_COVER_CHANNEL, async (event, request) => {
   }
 
   return copyBoardCoverImage(boardId, result.filePaths[0]);
+});
+ipcMain.handle(BOARD_IMAGE_CHOOSE_SECONDARY_CHANNEL, async (event, request) => {
+  const { boardId } = parseBoardImageChooseRequest(request);
+  const result = await showOpenDialogForSender(event.sender, {
+    title: "Choose secondary board photo",
+    buttonLabel: "Use photo",
+    properties: ["openFile"],
+    filters: [
+      {
+        name: "Images",
+        extensions: ["jpg", "jpeg", "png", "webp", "gif", "bmp"]
+      }
+    ]
+  });
+
+  if (result.canceled || !result.filePaths[0]) {
+    return { canceled: true };
+  }
+
+  return copyBoardSecondaryImage(boardId, result.filePaths[0]);
 });
 ipcMain.handle(BOARD_IMAGE_COPY_COVER_CHANNEL, (_event, request) => {
   const { boardId, file } = parseBoardImageCopyRequest(request);
@@ -955,6 +976,20 @@ function collectBackupAttachmentEntries(backup: VaultBackup): Array<{
     }
   }
 
+  for (const board of backup.data.boards) {
+    if (!board.secondaryImagePath) {
+      continue;
+    }
+
+    const entry = createBackupAttachmentEntry(board.secondaryImagePath);
+
+    if (entry && !seen.has(entry.path)) {
+      seen.add(entry.path);
+      entries.push(entry);
+      board.secondaryImagePath = entry.path;
+    }
+  }
+
   for (const project of backup.data.projects) {
     if (!project.coverImagePath) {
       continue;
@@ -1031,6 +1066,9 @@ function rewriteBackupAttachmentPaths(backup: VaultBackup): void {
   for (const board of backup.data.boards) {
     if (board.coverImagePath) {
       board.coverImagePath = resolveRestoredAttachmentPath(board.coverImagePath);
+    }
+    if (board.secondaryImagePath) {
+      board.secondaryImagePath = resolveRestoredAttachmentPath(board.secondaryImagePath);
     }
   }
 
@@ -1449,7 +1487,28 @@ function copyBoardCoverImage(
     boardId,
     sourcePath,
     getBoardCoverImageDirectory,
-    readBoardCoverImageDataUrl
+    readBoardCoverImageDataUrl,
+    "cover"
+  );
+}
+
+function copyBoardSecondaryImage(
+  boardId: string,
+  sourcePath: string
+): {
+  canceled: false;
+  dataUrl: string | null;
+  filename: string;
+  localPath: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+} {
+  return copyCoverImage(
+    boardId,
+    sourcePath,
+    getBoardCoverImageDirectory,
+    readBoardCoverImageDataUrl,
+    "secondary"
   );
 }
 
@@ -1514,7 +1573,8 @@ function copyCoverImage(
   ownerId: string,
   sourcePath: string,
   getTargetDirectory: (ownerId: string) => string,
-  readDataUrl: (localPath: string) => string | null
+  readDataUrl: (localPath: string) => string | null,
+  filePrefix = "cover"
 ): {
   canceled: false;
   dataUrl: string | null;
@@ -1531,7 +1591,7 @@ function copyCoverImage(
   }
 
   const targetDirectory = getTargetDirectory(ownerId);
-  const targetFilename = `cover-${Date.now()}-${randomUUID()}${extension}`;
+  const targetFilename = `${filePrefix}-${Date.now()}-${randomUUID()}${extension}`;
   const targetPath = path.join(targetDirectory, targetFilename);
 
   mkdirSync(targetDirectory, { recursive: true });

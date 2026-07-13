@@ -39,6 +39,10 @@ export class DexieBoardRepository implements BoardRepository {
       coverImageFilename: this.optionalText(input.coverImageFilename),
       coverImageMimeType: this.optionalText(input.coverImageMimeType),
       coverImageSizeBytes: this.optionalNumber(input.coverImageSizeBytes),
+      secondaryImagePath: this.optionalText(input.secondaryImagePath),
+      secondaryImageFilename: this.optionalText(input.secondaryImageFilename),
+      secondaryImageMimeType: this.optionalText(input.secondaryImageMimeType),
+      secondaryImageSizeBytes: this.optionalNumber(input.secondaryImageSizeBytes),
       status: input.status ?? "unknown",
       chipModel: this.optionalText(input.chipModel),
       chipRevision: this.optionalNumber(input.chipRevision),
@@ -124,6 +128,22 @@ export class DexieBoardRepository implements BoardRepository {
         input.coverImageSizeBytes === undefined
           ? existing.coverImageSizeBytes
           : this.optionalNumber(input.coverImageSizeBytes),
+      secondaryImagePath:
+        input.secondaryImagePath === undefined
+          ? existing.secondaryImagePath
+          : this.optionalText(input.secondaryImagePath),
+      secondaryImageFilename:
+        input.secondaryImageFilename === undefined
+          ? existing.secondaryImageFilename
+          : this.optionalText(input.secondaryImageFilename),
+      secondaryImageMimeType:
+        input.secondaryImageMimeType === undefined
+          ? existing.secondaryImageMimeType
+          : this.optionalText(input.secondaryImageMimeType),
+      secondaryImageSizeBytes:
+        input.secondaryImageSizeBytes === undefined
+          ? existing.secondaryImageSizeBytes
+          : this.optionalNumber(input.secondaryImageSizeBytes),
       status: input.status ?? existing.status,
       chipModel:
         input.chipModel === undefined
@@ -394,6 +414,10 @@ export class DexieBoardRepository implements BoardRepository {
       coverImageFilename: board.coverImageFilename ?? null,
       coverImageMimeType: board.coverImageMimeType ?? null,
       coverImageSizeBytes: board.coverImageSizeBytes ?? null,
+      secondaryImagePath: board.secondaryImagePath ?? null,
+      secondaryImageFilename: board.secondaryImageFilename ?? null,
+      secondaryImageMimeType: board.secondaryImageMimeType ?? null,
+      secondaryImageSizeBytes: board.secondaryImageSizeBytes ?? null,
       chipRevision: board.chipRevision ?? null,
       chipVariant: board.chipVariant ?? null,
       chipFamily: board.chipFamily ?? null,

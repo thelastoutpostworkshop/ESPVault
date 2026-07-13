@@ -19,6 +19,10 @@ export interface Board {
   coverImageFilename: string | null;
   coverImageMimeType: string | null;
   coverImageSizeBytes: number | null;
+  secondaryImagePath: string | null;
+  secondaryImageFilename: string | null;
+  secondaryImageMimeType: string | null;
+  secondaryImageSizeBytes: number | null;
   status: BoardStatus;
   chipModel: string | null;
   chipRevision: number | null;
@@ -73,6 +77,10 @@ export interface CreateBoardInput {
   coverImageFilename?: string | null;
   coverImageMimeType?: string | null;
   coverImageSizeBytes?: number | null;
+  secondaryImagePath?: string | null;
+  secondaryImageFilename?: string | null;
+  secondaryImageMimeType?: string | null;
+  secondaryImageSizeBytes?: number | null;
   status?: BoardStatus;
   chipModel?: string | null;
   chipRevision?: number | null;

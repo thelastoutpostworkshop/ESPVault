@@ -41,7 +41,7 @@ describe("Dexie repositories", () => {
 
     await database.open();
 
-    expect(database.verno).toBe(4);
+    expect(database.verno).toBe(5);
     expect(database.tables.map((table) => table.name).sort()).toEqual([
       "appSettings",
       "attachments",
@@ -68,7 +68,7 @@ describe("Dexie repositories", () => {
       databaseName: database.name,
       missingTables: [],
       ok: true,
-      schemaVersion: 4
+      schemaVersion: 5
     });
     expect(result.expectedTables.sort()).toEqual([
       "appSettings",
@@ -441,7 +441,7 @@ describe("Dexie repositories", () => {
 
     await database.open();
 
-    expect(database.verno).toBe(4);
+    expect(database.verno).toBe(5);
     expect(await projects.get("legacy-project")).toMatchObject({
       id: "legacy-project",
       location: null
@@ -450,7 +450,8 @@ describe("Dexie repositories", () => {
       id: "legacy-board",
       chipModel: "ESP32",
       partitions: null,
-      lastScannedAt: null
+      lastScannedAt: null,
+      secondaryImagePath: null
     });
     await projects.update("legacy-project", { location: "Archive shelf" });
     expect(await projects.get("legacy-project")).toMatchObject({

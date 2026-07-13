@@ -61,6 +61,7 @@ export function installBrowserHarnessApi(): void {
 function createCoverImageApi(ownerType: "board" | "project"): EspBoardVaultApi["boardImages"] {
   return {
     chooseCover: async () => ({ canceled: true }),
+    chooseSecondary: async () => ({ canceled: true }),
     copyCoverFromFile: async (ownerId, file) =>
       copyCoverImageFromFile(ownerType, ownerId, file),
     deleteCover: async (localPath) => {

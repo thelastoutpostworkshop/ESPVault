@@ -13,6 +13,8 @@ All notable changes to ESP Board Vault are documented in this file.
   ([#8](https://github.com/thelastoutpostworkshop/ESPVault/issues/8)).
 - Allow reserved serial ports to remain visible but start unchecked during scans
   ([#11](https://github.com/thelastoutpostworkshop/ESPVault/issues/11)).
+- Add a secondary board photo for pinouts, wiring, underside views, or other
+  reference images ([#10](https://github.com/thelastoutpostworkshop/ESPVault/issues/10)).
 - Open a board's edit dialog by double-clicking its row in the board list
   ([#12](https://github.com/thelastoutpostworkshop/ESPVault/issues/12)).
 
