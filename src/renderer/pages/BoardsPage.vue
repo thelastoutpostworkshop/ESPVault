@@ -60,6 +60,13 @@ interface ActiveBoardFilterChip {
   color: string;
 }
 
+interface DescriptionSegment {
+  type: "link" | "text";
+  value: string;
+}
+
+const DESCRIPTION_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
+
 const boardStore = useBoardStore();
 const { boards, chipModels, error, loading } = storeToRefs(boardStore);
 const projectStore = useProjectStore();
@@ -187,6 +194,12 @@ const selectedBoard = computed(() => {
     filteredBoards.value[0]
   );
 });
+const selectedBoardDescription = computed(
+  () => selectedBoard.value?.description || selectedBoard.value?.notes || "No notes yet"
+);
+const selectedBoardDescriptionSegments = computed(() =>
+  splitDescriptionIntoSegments(selectedBoardDescription.value)
+);
 
 const selectedPartitionRows = computed(() => selectedBoard.value?.partitions ?? []);
 const selectedPartitionSegments = computed(() =>
@@ -251,6 +264,34 @@ function openEditDialog(board: Board): void {
 
 function selectBoard(board: Board): void {
   selectedBoardId.value = board.id;
+}
+
+function splitDescriptionIntoSegments(description: string): DescriptionSegment[] {
+  const segments: DescriptionSegment[] = [];
+  let cursor = 0;
+
+  for (const match of description.matchAll(DESCRIPTION_URL_PATTERN)) {
+    const url = match[0].replace(/[.,!?;:]+$/, "");
+    const start = match.index ?? 0;
+
+    if (start > cursor) {
+      segments.push({ type: "text", value: description.slice(cursor, start) });
+    }
+
+    segments.push({ type: "link", value: url });
+    cursor = start + url.length;
+  }
+
+  if (cursor < description.length || !segments.length) {
+    segments.push({ type: "text", value: description.slice(cursor) });
+  }
+
+  return segments;
+}
+
+function openDescriptionLink(event: MouseEvent, url: string): void {
+  event.preventDefault();
+  void window.api.shell.openExternal(url);
 }
 
 function clearBoardFilter(filterKey: ActiveBoardFilterKey): void {
@@ -778,7 +819,15 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
             </div>
           </div>
           <div class="text-body-2 muted detail-description">
-            {{ selectedBoard.description || selectedBoard.notes || "No notes yet" }}
+            <template v-for="(segment, index) in selectedBoardDescriptionSegments" :key="index">
+              <a
+                v-if="segment.type === 'link'"
+                class="board-description-link"
+                :href="segment.value"
+                @click="openDescriptionLink($event, segment.value)"
+              >{{ segment.value }}</a>
+              <template v-else>{{ segment.value }}</template>
+            </template>
           </div>
           <div class="board-detail-timestamps">
             <span>
@@ -1327,6 +1376,13 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
   max-width: 100%;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.board-description-link {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 
 .board-detail-actions {

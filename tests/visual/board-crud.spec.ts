@@ -2,6 +2,31 @@ import { expect, test } from "@playwright/test";
 import { chooseSelectOption, openHarness, openView, tableRow } from "./helpers";
 
 test.describe("board inventory flow", () => {
+  test("opens description links through the external-link API", async ({ page }) => {
+    const documentationUrl = "https://example.com/esp32-datasheet";
+
+    await openHarness(page);
+    await openView(page, "Boards");
+    await tableRow(page, "Workbench ESP32 DevKit").dblclick();
+
+    const editDialog = page.getByRole("dialog").filter({ hasText: "Edit board" });
+    await editDialog
+      .getByLabel("Description")
+      .fill(`Documentation: ${documentationUrl}`);
+    await editDialog.getByRole("button", { name: "Save board" }).click();
+
+    const link = page.getByRole("link", { name: documentationUrl });
+    await expect(link).toHaveAttribute("href", documentationUrl);
+    await Promise.all([
+      page.waitForEvent(
+        "console",
+        (message) =>
+          message.type() === "info" && message.text().includes(documentationUrl)
+      ),
+      link.click()
+    ]);
+  });
+
   test("creates, edits, persists, and deletes a board", async ({ page }) => {
     const boardName = "QA Harness C6 Board";
     const updatedBoardName = "QA Harness C6 Board Updated";
