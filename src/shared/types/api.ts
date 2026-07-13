@@ -39,6 +39,7 @@ export interface EspBoardVaultApi {
   serial: {
     getLastSelection(): Promise<SerialPortSelection>;
     getLastSelectionCount(): Promise<number>;
+    setReservedPortNames(portNames: string[]): Promise<void>;
   };
   shell: {
     openExternal(url: string): Promise<void>;

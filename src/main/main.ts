@@ -35,6 +35,7 @@ import type {
 import {
   isLegacyLinuxTtyPort,
   isPreferredSerialPort,
+  isReservedSerialPort,
   shouldHideLegacyLinuxTtyPortsByDefault,
   type SelectableSerialPort
 } from "./serialPorts";
@@ -43,6 +44,7 @@ import { prepareUpgradeSnapshot } from "./upgradeSnapshots";
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const SERIAL_SELECTION_CHANNEL = "serial:get-last-selection";
 const SERIAL_SELECTION_COUNT_CHANNEL = "serial:get-last-selection-count";
+const SERIAL_SET_RESERVED_PORT_NAMES_CHANNEL = "serial:set-reserved-port-names";
 const APP_GET_VERSION_CHANNEL = "app:get-version";
 const CLIPBOARD_WRITE_TEXT_CHANNEL = "clipboard:write-text";
 const DATABASE_CHANGE_LOCATION_CHANNEL = "database:change-location";
@@ -80,6 +82,7 @@ const MIN_WINDOW_SIZE: WindowSize = {
 const LINUX_DESKTOP_NAME = "esp-board-vault.desktop";
 
 let lastSerialPortSelection: SerialPortSelection = createEmptySerialPortSelection();
+let reservedSerialPortNames: string[] = [];
 let mainWindow: BrowserWindow | null = null;
 let windowSizeSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -124,6 +127,9 @@ ipcMain.handle(
   SERIAL_SELECTION_COUNT_CHANNEL,
   () => lastSerialPortSelection.selectedCount
 );
+ipcMain.handle(SERIAL_SET_RESERVED_PORT_NAMES_CHANNEL, (_event, portNames: unknown) => {
+  reservedSerialPortNames = normalizeReservedSerialPortNames(portNames);
+});
 ipcMain.handle(CLIPBOARD_WRITE_TEXT_CHANNEL, (_event, text: unknown) => {
   if (typeof text !== "string") {
     throw new Error("Clipboard text must be a string.");
@@ -1752,13 +1758,21 @@ function configureWebSerial(window: BrowserWindow): void {
   session.on("select-serial-port", async (event, portList, _webContents, callback) => {
     event.preventDefault();
 
-    if (portList.length <= 1) {
+    const onlyPortIsReserved =
+      portList.length === 1 &&
+      isReservedSerialPort(portList[0], reservedSerialPortNames);
+
+    if (portList.length <= 1 && !onlyPortIsReserved) {
       rememberSerialPortSelection(portList, portList);
       callback(portList[0]?.portId ?? "");
       return;
     }
 
-    const selectedPorts = await showSerialPortPicker(window, portList);
+    const selectedPorts = await showSerialPortPicker(
+      window,
+      portList,
+      reservedSerialPortNames
+    );
     rememberSerialPortSelection(portList, selectedPorts);
     callback(selectedPorts[0]?.portId ?? "");
   });
@@ -1792,6 +1806,22 @@ function createEmptySerialPortSelection(): SerialPortSelection {
   };
 }
 
+function normalizeReservedSerialPortNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((name): name is string => typeof name === "string")
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .slice(0, 100)
+    )
+  );
+}
+
 function parseUsbId(value: string | undefined): number | null {
   if (!value) {
     return null;
@@ -1815,7 +1845,8 @@ function isTrustedAppOrigin(origin: string | undefined): boolean {
 
 async function showSerialPortPicker<TPort extends SelectableSerialPort>(
   window: BrowserWindow,
-  ports: TPort[]
+  ports: TPort[],
+  reservedPortNames: readonly string[]
 ): Promise<TPort[]> {
   return new Promise((resolve) => {
     let settled = false;
@@ -1889,19 +1920,23 @@ async function showSerialPortPicker<TPort extends SelectableSerialPort>(
 
     void picker.loadURL(
       `data:text/html;charset=utf-8,${encodeURIComponent(
-        renderSerialPortPickerHtml(ports)
+        renderSerialPortPickerHtml(ports, reservedPortNames)
       )}`
     );
   });
 }
 
-function renderSerialPortPickerHtml(ports: SelectableSerialPort[]): string {
+function renderSerialPortPickerHtml(
+  ports: SelectableSerialPort[],
+  reservedPortNames: readonly string[]
+): string {
   const hideLegacyPortsByDefault = shouldHideLegacyLinuxTtyPortsByDefault(ports);
   const legacyPortCount = ports.filter((port) => isLegacyLinuxTtyPort(port)).length;
   const rows = ports
     .map(
       (port, index) => {
         const isLegacyPort = isLegacyLinuxTtyPort(port);
+        const isReservedPort = isReservedSerialPort(port, reservedPortNames);
         const isInitiallyHidden = hideLegacyPortsByDefault && isLegacyPort;
         const rowClasses = ["port-row", isLegacyPort ? "legacy-port" : ""]
           .filter(Boolean)
@@ -1910,13 +1945,14 @@ function renderSerialPortPickerHtml(ports: SelectableSerialPort[]): string {
         return `
         <label class="${rowClasses}"${isInitiallyHidden ? " hidden" : ""}>
           <input class="port-checkbox" type="checkbox" value="${index}"${
-            isInitiallyHidden ? "" : " checked"
+            isInitiallyHidden || isReservedPort ? "" : " checked"
           } data-legacy="${isLegacyPort ? "true" : "false"}" />
           <span class="port-body">
             <span class="port-title">
               ${escapeHtml(formatSerialPortButton(port))}
               ${isPreferredSerialPort(port) ? '<span class="badge">Suggested</span>' : ""}
               ${isLegacyPort ? '<span class="badge badge-muted">Legacy</span>' : ""}
+              ${isReservedPort ? '<span class="badge badge-reserved">Reserved</span>' : ""}
             </span>
             <span class="port-detail">${escapeHtml(formatSerialPortDetail(port))}</span>
           </span>
@@ -2034,6 +2070,10 @@ function renderSerialPortPickerHtml(ports: SelectableSerialPort[]): string {
     .badge-muted {
       color: #5d6458;
       background: #eef0eb;
+    }
+    .badge-reserved {
+      color: #8a5417;
+      background: #f8ead5;
     }
     footer {
       display: flex;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isLegacyLinuxTtyPort,
   isPreferredSerialPort,
+  isReservedSerialPort,
   shouldHideLegacyLinuxTtyPortsByDefault,
   type SelectableSerialPort
 } from "./serialPorts";
@@ -65,6 +66,18 @@ describe("serial port helpers", () => {
       true
     );
     expect(isPreferredSerialPort(port({ displayName: "ttyS0" }))).toBe(false);
+  });
+
+  it("matches reserved serial ports by their visible name", () => {
+    expect(
+      isReservedSerialPort(port({ portName: "COM1" }), ["com1"])
+    ).toBe(true);
+    expect(
+      isReservedSerialPort(port({ displayName: "u-blox GPS" }), ["u-blox GPS"])
+    ).toBe(true);
+    expect(
+      isReservedSerialPort(port({ portName: "COM4" }), ["COM1"])
+    ).toBe(false);
   });
 });
 

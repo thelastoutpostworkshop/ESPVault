@@ -10,6 +10,7 @@ import type {
   SerialPortSelection,
   SerialPortSelectionPort
 } from "../../shared/types/api";
+import { loadReservedSerialPortNames } from "./reservedSerialPorts";
 import { readChipMetadata, type ChipMetadata } from "./chipMetadata";
 import { readBoardPartitionTable } from "./espPartitionScanner";
 
@@ -126,6 +127,7 @@ export async function scanEspBoards(
 async function requestSelectedSerialPorts(
   onLog?: (level: ScannerLogLevel, message: string) => void
 ): Promise<SerialPort[]> {
+  await configureReservedSerialPorts(onLog);
   const firstPort = await navigator.serial.requestPort();
   const selection = await getLastSerialSelection();
   const selectionCount = selection.selectedCount || 1;
@@ -149,6 +151,21 @@ async function requestSelectedSerialPorts(
   }
 
   return selectedPorts;
+}
+
+async function configureReservedSerialPorts(
+  onLog?: (level: ScannerLogLevel, message: string) => void
+): Promise<void> {
+  try {
+    const reservedPortNames = await loadReservedSerialPortNames();
+    await window.api.serial.setReservedPortNames(reservedPortNames);
+
+    if (reservedPortNames.length) {
+      onLog?.("log", `${reservedPortNames.length} reserved serial port(s) will start unchecked.`);
+    }
+  } catch {
+    onLog?.("debug", "Reserved serial ports could not be loaded; using default selection.");
+  }
 }
 
 function dedupeSerialPorts(ports: SerialPort[]): SerialPort[] {

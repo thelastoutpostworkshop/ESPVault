@@ -44,7 +44,8 @@ export function installBrowserHarnessApi(): void {
         selectedCount: 0,
         selectedPorts: []
       }),
-      getLastSelectionCount: async () => 0
+      getLastSelectionCount: async () => 0,
+      setReservedPortNames: async () => undefined
     },
     shell: {
       openExternal: async (url) => {

@@ -133,7 +133,9 @@ const api: EspBoardVaultApi = {
         }>;
       }>,
     getLastSelectionCount: () =>
-      ipcRenderer.invoke("serial:get-last-selection-count") as Promise<number>
+      ipcRenderer.invoke("serial:get-last-selection-count") as Promise<number>,
+    setReservedPortNames: (portNames) =>
+      ipcRenderer.invoke("serial:set-reserved-port-names", portNames) as Promise<void>
   },
   shell: {
     openExternal: (url) =>

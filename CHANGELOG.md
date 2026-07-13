@@ -11,6 +11,8 @@ All notable changes to ESP Board Vault are documented in this file.
   ([#9](https://github.com/thelastoutpostworkshop/ESPVault/issues/9)).
 - Add direct board-list sorting by board name, status, or chip model
   ([#8](https://github.com/thelastoutpostworkshop/ESPVault/issues/8)).
+- Allow reserved serial ports to remain visible but start unchecked during scans
+  ([#11](https://github.com/thelastoutpostworkshop/ESPVault/issues/11)).
 - Open a board's edit dialog by double-clicking its row in the board list
   ([#12](https://github.com/thelastoutpostworkshop/ESPVault/issues/12)).
 

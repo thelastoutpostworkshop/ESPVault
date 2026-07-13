@@ -63,3 +63,20 @@ export function isPreferredSerialPort(port: SelectableSerialPort): boolean {
     searchableText.includes("silicon labs")
   );
 }
+
+export function isReservedSerialPort(
+  port: SelectableSerialPort,
+  reservedPortNames: readonly string[]
+): boolean {
+  const reservedNames = new Set(
+    reservedPortNames.map(normalizePortName).filter((name) => Boolean(name))
+  );
+
+  return [port.portName, port.displayName, port.portId]
+    .map(normalizePortName)
+    .some((name) => Boolean(name) && reservedNames.has(name));
+}
+
+function normalizePortName(value: string | undefined): string {
+  return value?.trim().toLocaleLowerCase() ?? "";
+}
