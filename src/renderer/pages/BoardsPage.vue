@@ -701,6 +701,7 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
               class="board-row"
               :class="{ 'board-row--selected': selectedBoard?.id === board.id }"
               @click="selectBoard(board)"
+              @dblclick="openEditDialog(board)"
             >
               <td>
                 <div class="board-list-identity">

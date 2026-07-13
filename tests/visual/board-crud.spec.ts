@@ -32,8 +32,7 @@ test.describe("board inventory flow", () => {
     await openView(page, "Boards");
     await expect(tableRow(page, boardName)).toBeVisible();
 
-    await tableRow(page, boardName).click();
-    await page.getByLabel("Edit board").click();
+    await tableRow(page, boardName).dblclick();
 
     const editDialog = page.getByRole("dialog").filter({ hasText: "Edit board" });
     await expect(editDialog).toBeVisible();
