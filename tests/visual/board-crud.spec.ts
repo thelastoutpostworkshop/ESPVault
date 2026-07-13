@@ -2,6 +2,17 @@ import { expect, test } from "@playwright/test";
 import { chooseSelectOption, openHarness, openView, tableRow } from "./helpers";
 
 test.describe("board inventory flow", () => {
+  test("sorts boards by the selected field", async ({ page }) => {
+    await openHarness(page);
+    await openView(page, "Boards");
+
+    await page.getByRole("button", { name: "Sort by board name" }).click();
+
+    await expect(page.locator(".boards-table tbody .board-row").first()).toContainText(
+      "Compact C3 Recovery Board"
+    );
+  });
+
   test("opens description links through the external-link API", async ({ page }) => {
     const documentationUrl = "https://example.com/esp32-datasheet";
 

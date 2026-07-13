@@ -6,11 +6,13 @@ All notable changes to ESP Board Vault are documented in this file.
 
 ### Added
 
-- Open a board's edit dialog by double-clicking its row in the board list
-  ([#12](https://github.com/thelastoutpostworkshop/ESPVault/issues/12)).
 - Make HTTP(S) links in board descriptions clickable for fast access to
   datasheets, repositories, and other documentation
   ([#9](https://github.com/thelastoutpostworkshop/ESPVault/issues/9)).
+- Add direct board-list sorting by board name, status, or chip model
+  ([#8](https://github.com/thelastoutpostworkshop/ESPVault/issues/8)).
+- Open a board's edit dialog by double-clicking its row in the board list
+  ([#12](https://github.com/thelastoutpostworkshop/ESPVault/issues/12)).
 
 ## 1.0.31
 

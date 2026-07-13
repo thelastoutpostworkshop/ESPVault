@@ -43,6 +43,13 @@ type BoardStatusFilter =
   | BoardStatus
   | "all"
   | typeof UNASSIGNED_PROJECT_STATUS_FILTER;
+type BoardSortField = "updatedAt" | "name" | "status" | "chipModel";
+type SortDirection = "asc" | "desc";
+
+interface BoardSort {
+  field: BoardSortField;
+  direction: SortDirection;
+}
 
 interface BoardFilters {
   search: string;
@@ -96,6 +103,7 @@ const filters = reactive<BoardFilters>({
   status: "all",
   chipModel: ""
 });
+const boardSort = ref<BoardSort>({ field: "updatedAt", direction: "desc" });
 
 const statusOptions: Array<{ title: string; value: BoardStatusFilter }> = [
   { title: "All statuses", value: "all" },
@@ -108,7 +116,6 @@ const statusOptions: Array<{ title: string; value: BoardStatusFilter }> = [
     value: status
   }))
 ];
-
 const chipModelOptions = computed(() => [
   { title: "All chip models", value: "" },
   ...chipModels.value.map((model) => ({ title: model, value: model }))
@@ -158,30 +165,32 @@ const locationOptions = computed(() =>
 const filteredBoards = computed(() => {
   const search = filters.search.trim().toLowerCase();
 
-  return boards.value.filter((board) => {
-    const matchesSearch =
-      !search ||
-      [
-        board.name,
-        board.description,
-        board.chipModel,
-        board.macAddress,
-        board.physicalLocation,
-        board.notes
-      ]
-        .filter((value): value is string => Boolean(value))
-        .some((value) => value.toLowerCase().includes(search));
+  return boards.value
+    .filter((board) => {
+      const matchesSearch =
+        !search ||
+        [
+          board.name,
+          board.description,
+          board.chipModel,
+          board.macAddress,
+          board.physicalLocation,
+          board.notes
+        ]
+          .filter((value): value is string => Boolean(value))
+          .some((value) => value.toLowerCase().includes(search));
 
-    const matchesStatus =
-      filters.status === "all" ||
-      (filters.status === UNASSIGNED_PROJECT_STATUS_FILTER
-        ? !board.projectId
-        : board.status === filters.status);
-    const matchesChipModel =
-      !filters.chipModel || board.chipModel === filters.chipModel;
+      const matchesStatus =
+        filters.status === "all" ||
+        (filters.status === UNASSIGNED_PROJECT_STATUS_FILTER
+          ? !board.projectId
+          : board.status === filters.status);
+      const matchesChipModel =
+        !filters.chipModel || board.chipModel === filters.chipModel;
 
-    return matchesSearch && matchesStatus && matchesChipModel;
-  });
+      return matchesSearch && matchesStatus && matchesChipModel;
+    })
+    .sort(compareBoards);
 });
 
 const selectedBoard = computed(() => {
@@ -264,6 +273,82 @@ function openEditDialog(board: Board): void {
 
 function selectBoard(board: Board): void {
   selectedBoardId.value = board.id;
+}
+
+function toggleBoardSort(field: Exclude<BoardSortField, "updatedAt">): void {
+  if (boardSort.value.field === field) {
+    boardSort.value = {
+      field,
+      direction: boardSort.value.direction === "asc" ? "desc" : "asc"
+    };
+    return;
+  }
+
+  boardSort.value = { field, direction: "asc" };
+}
+
+function boardSortIcon(field: Exclude<BoardSortField, "updatedAt">): string {
+  if (boardSort.value.field !== field) {
+    return "mdi-sort";
+  }
+
+  return boardSort.value.direction === "asc"
+    ? "mdi-sort-ascending"
+    : "mdi-sort-descending";
+}
+
+function boardSortLabel(field: Exclude<BoardSortField, "updatedAt">, label: string): string {
+  if (boardSort.value.field !== field) {
+    return `Sort by ${label}`;
+  }
+
+  const nextDirection = boardSort.value.direction === "asc" ? "descending" : "ascending";
+  return `Sort by ${label} ${nextDirection}`;
+}
+
+function compareBoards(left: Board, right: Board): number {
+  const { direction, field } = boardSort.value;
+  let comparison: number;
+
+  switch (field) {
+    case "name":
+      comparison = compareBoardText(left.name, right.name, direction);
+      break;
+    case "chipModel":
+      comparison = compareBoardText(left.chipModel, right.chipModel, direction);
+      break;
+    case "status":
+      comparison = compareBoardText(
+        BOARD_STATUS_LABELS[left.status],
+        BOARD_STATUS_LABELS[right.status],
+        direction
+      );
+      break;
+    case "updatedAt":
+      comparison = compareBoardText(left.updatedAt, right.updatedAt, direction);
+      break;
+  }
+
+  return comparison || compareBoardText(left.name, right.name) || left.id.localeCompare(right.id);
+}
+
+function compareBoardText(
+  left: string | null | undefined,
+  right: string | null | undefined,
+  direction: SortDirection = "asc"
+): number {
+  const leftValue = left?.trim() ?? "";
+  const rightValue = right?.trim() ?? "";
+
+  if (!leftValue || !rightValue) {
+    return Number(!leftValue) - Number(!rightValue);
+  }
+
+  const multiplier = direction === "asc" ? 1 : -1;
+  return multiplier * leftValue.localeCompare(rightValue, undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
 }
 
 function splitDescriptionIntoSegments(description: string): DescriptionSegment[] {
@@ -730,9 +815,42 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
         <v-table class="vault-data-table boards-table">
           <thead>
             <tr>
-              <th>Board</th>
-              <th>Status</th>
-              <th>Chip</th>
+              <th>
+                <button
+                  class="board-sort-button"
+                  type="button"
+                  :aria-label="boardSortLabel('name', 'board name')"
+                  :aria-pressed="boardSort.field === 'name'"
+                  @click="toggleBoardSort('name')"
+                >
+                  Board
+                  <v-icon :icon="boardSortIcon('name')" size="16" />
+                </button>
+              </th>
+              <th>
+                <button
+                  class="board-sort-button"
+                  type="button"
+                  :aria-label="boardSortLabel('status', 'status')"
+                  :aria-pressed="boardSort.field === 'status'"
+                  @click="toggleBoardSort('status')"
+                >
+                  Status
+                  <v-icon :icon="boardSortIcon('status')" size="16" />
+                </button>
+              </th>
+              <th>
+                <button
+                  class="board-sort-button"
+                  type="button"
+                  :aria-label="boardSortLabel('chipModel', 'chip model')"
+                  :aria-pressed="boardSort.field === 'chipModel'"
+                  @click="toggleBoardSort('chipModel')"
+                >
+                  Chip
+                  <v-icon :icon="boardSortIcon('chipModel')" size="16" />
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1344,6 +1462,30 @@ function uniqueLocationOptions(values: Array<string | null | undefined>): string
 
 .boards-table :deep(th) {
   white-space: nowrap;
+}
+
+.board-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: inherit;
+}
+
+.board-sort-button:hover,
+.board-sort-button:focus-visible {
+  color: rgb(var(--v-theme-primary));
+}
+
+.board-sort-button:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 3px;
 }
 
 .boards-table :deep(td:first-child) {
