@@ -2,6 +2,13 @@
 
 All notable changes to ESP Board Vault are documented in this file.
 
+## 1.0.32
+
+### Added
+
+- Open a board's edit dialog by double-clicking its row in the board list
+  ([#12](https://github.com/thelastoutpostworkshop/ESPVault/issues/12)).
+
 ## 1.0.31
 
 ### Changed
