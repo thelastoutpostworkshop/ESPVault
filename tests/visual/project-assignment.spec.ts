@@ -36,8 +36,7 @@ test.describe("project assignment flow", () => {
     await expect(addDialog).toBeHidden();
     await expect(tableRow(page, projectName)).toBeVisible();
 
-    await tableRow(page, projectName).click();
-    await page.getByLabel("Edit project").click();
+    await tableRow(page, projectName).dblclick();
 
     const editDialog = page.getByRole("dialog").filter({ hasText: "Edit project" });
     await expect(editDialog).toBeVisible();

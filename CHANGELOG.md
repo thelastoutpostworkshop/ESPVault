@@ -17,6 +17,7 @@ All notable changes to ESP Board Vault are documented in this file.
   reference images ([#10](https://github.com/thelastoutpostworkshop/ESPVault/issues/10)).
 - Open a board's edit dialog by double-clicking its row in the board list
   ([#12](https://github.com/thelastoutpostworkshop/ESPVault/issues/12)).
+- Open a project's edit dialog by double-clicking its row in the project list.
 
 ## 1.0.31
 

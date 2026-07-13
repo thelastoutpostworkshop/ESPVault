@@ -1162,6 +1162,7 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
               class="project-row"
               :class="{ 'project-row--selected': selectedRow?.project.id === row.project.id }"
               @click="selectProject(row.project)"
+              @dblclick="openEditDialog(row.project)"
             >
               <td>
                 <div class="project-list-identity">
