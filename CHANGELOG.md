@@ -2,6 +2,15 @@
 
 All notable changes to ESP Board Vault are documented in this file.
 
+## 1.0.33
+
+### Changed
+
+- Clarified how to save scan results to an existing board: rescans now explain
+  that the saved record remains unchanged until **Save latest scan** is chosen,
+  and the action explains which board details it preserves
+  ([#13](https://github.com/thelastoutpostworkshop/ESPVault/issues/13)).
+
 ## 1.0.32
 
 ### Added

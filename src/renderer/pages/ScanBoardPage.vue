@@ -753,6 +753,18 @@ watch(
         </v-btn>
       </v-card-title>
       <v-divider />
+      <v-alert
+        v-if="savedDetectedBoardCount"
+        class="ma-4 mb-0"
+        color="info"
+        density="compact"
+        icon="mdi-information-outline"
+        variant="tonal"
+      >
+        Rescanning reads the board again but does not change its saved record automatically.
+        Choose <strong>Save latest scan</strong> beside a saved board to store the detected
+        hardware details and update its last scan date.
+      </v-alert>
       <v-table class="vault-data-table detected-board-table">
         <thead>
           <tr>
@@ -816,28 +828,36 @@ watch(
                 >
                   Open
                 </v-btn>
-                <v-btn
-                  color="primary"
-                  size="small"
-                  variant="outlined"
-                  :prepend-icon="
-                    isScanUpdateApplied(detectedBoard, index)
-                      ? 'mdi-check'
-                      : 'mdi-refresh'
-                  "
-                  :disabled="
-                    isScanUpdateApplied(detectedBoard, index) ||
-                    isScanUpdatePending(detectedBoard, index)
-                  "
-                  :loading="isScanUpdatePending(detectedBoard, index)"
-                  @click="updateSavedBoardFromScan(detectedBoard, index)"
+                <v-tooltip
+                  location="top"
+                  text="Saves detected hardware details and the last scan date. Your board name, notes, location, and status are kept."
                 >
-                  {{
-                    isScanUpdateApplied(detectedBoard, index)
-                      ? "Updated"
-                      : "Update from scan"
-                  }}
-                </v-btn>
+                  <template #activator="{ props: tooltipProps }">
+                    <v-btn
+                      v-bind="tooltipProps"
+                      color="primary"
+                      size="small"
+                      variant="outlined"
+                      :prepend-icon="
+                        isScanUpdateApplied(detectedBoard, index)
+                          ? 'mdi-check'
+                          : 'mdi-content-save-outline'
+                      "
+                      :disabled="
+                        isScanUpdateApplied(detectedBoard, index) ||
+                        isScanUpdatePending(detectedBoard, index)
+                      "
+                      :loading="isScanUpdatePending(detectedBoard, index)"
+                      @click="updateSavedBoardFromScan(detectedBoard, index)"
+                    >
+                      {{
+                        isScanUpdateApplied(detectedBoard, index)
+                          ? "Latest scan saved"
+                          : "Save latest scan"
+                      }}
+                    </v-btn>
+                  </template>
+                </v-tooltip>
                 <v-btn
                   size="small"
                   variant="text"
