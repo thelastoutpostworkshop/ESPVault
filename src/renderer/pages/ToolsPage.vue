@@ -168,7 +168,7 @@ function normalizeYoutubeVideoId(value: string | null | undefined): string | nul
   <section class="page-shell">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Tools</h1>
+        <h1 class="page-title">Maker Tools</h1>
         <p class="page-subtitle">
           Maker utilities from The Last Outpost Workshop for ESP32 and embedded projects.
         </p>

@@ -91,7 +91,7 @@ const navItems: NavItem[] = [
 ];
 
 const resourceNavItems: NavItem[] = [
-  { key: "tools", title: "Tools", icon: "mdi-tools" }
+  { key: "tools", title: "Maker Tools", icon: "mdi-tools" }
 ];
 
 const resourceItems: ResourceItem[] = [
