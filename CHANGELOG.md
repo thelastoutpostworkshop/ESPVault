@@ -10,6 +10,7 @@ All notable changes to ESP Board Vault are documented in this file.
   that the saved record remains unchanged until **Save latest scan** is chosen,
   and the action explains which board details it preserves
   ([#13](https://github.com/thelastoutpostworkshop/ESPVault/issues/13)).
+- Upgraded Pinia to 4.0.2 and added its Vue Devtools API peer dependency.
 
 ## 1.0.32
 

@@ -24,7 +24,8 @@
     "@mdi/font": "^7.4.47",
     "chart.js": "^4.5.1",
     "dexie": "^4.4.2",
-    "pinia": "^3.0.3",
+    "@vue/devtools-api": "^8.1.5",
+    "pinia": "^4.0.2",
     "tasmota-webserial-esptool": "^9.2.21",
     "vue": "^3.5.18",
     "vuetify": "^4.0.7"
