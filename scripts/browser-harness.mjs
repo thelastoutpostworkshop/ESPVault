@@ -8,7 +8,7 @@ const port = Number.isFinite(requestedPort) ? requestedPort : 5173;
 const strictPort = process.env.BROWSER_HARNESS_STRICT_PORT === "true";
 
 const rendererServer = await createServer({
-  configFile: "vite.config.ts",
+  configFile: "vite.config.mjs",
   server: {
     host: "127.0.0.1",
     port,

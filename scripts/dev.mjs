@@ -4,7 +4,7 @@ import { createServer } from "vite";
 import { buildElectronBundles } from "./buildElectronBundles.mjs";
 
 const rendererServer = await createServer({
-  configFile: "vite.config.ts",
+  configFile: "vite.config.mjs",
   server: {
     host: "127.0.0.1",
     port: 5173,

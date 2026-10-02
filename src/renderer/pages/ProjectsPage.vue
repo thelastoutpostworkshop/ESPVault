@@ -138,12 +138,13 @@ const loading = computed(
 const error = computed(
   () => projectError.value ?? boardError.value ?? checklistError.value
 );
+const projectStatusOptions = PROJECT_STATUSES.map((status) => ({
+  title: PROJECT_STATUS_LABELS[status],
+  value: status
+}));
 const statusOptions = [
   { title: "All statuses", value: "all" },
-  ...PROJECT_STATUSES.map((status) => ({
-    title: PROJECT_STATUS_LABELS[status],
-    value: status
-  }))
+  ...projectStatusOptions
 ];
 const PROJECT_STATUS_ICONS: Record<ProjectStatus, string> = {
   active: "mdi-play-circle-outline",
@@ -1709,10 +1710,7 @@ async function readCoverImageFile(file: File): Promise<CoverImageFileInput> {
               <v-col cols="12" md="4">
                 <v-select
                   v-model="form.status"
-                  :items="PROJECT_STATUSES.map((status) => ({
-                    title: PROJECT_STATUS_LABELS[status],
-                    value: status
-                  }))"
+                  :items="projectStatusOptions"
                   label="Status"
                 />
               </v-col>
