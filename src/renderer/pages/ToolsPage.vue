@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import arduinoMakerWorkshopThumbnail from "../assets/tool-thumbnails/arduino-maker-workshop.jpg";
+import espImageServerThumbnail from "../assets/tool-thumbnails/esp-image-server.jpg";
 import espConnectThumbnail from "../assets/tool-thumbnails/espconnect.jpg";
 import gpioViewerThumbnail from "../assets/tool-thumbnails/gpio-viewer.jpg";
 import partitionBuilderThumbnail from "../assets/tool-thumbnails/partition-builder.jpg";
@@ -10,7 +11,7 @@ interface ToolItem {
   key: string;
   title: string;
   icon: string;
-  url: string;
+  url?: string;
   description: string;
   actionIcon?: string;
   actionLabel?: string;
@@ -27,6 +28,7 @@ interface ToolCardItem extends ToolItem {
 const error = ref<string | null>(null);
 const coffeeUrl = "https://buymeacoffee.com/thelastoutpostworkshop";
 const tutorialThumbnailsByVideoId: Record<string, string> = {
+  "4_eT38NmxBw": espImageServerThumbnail,
   "-nhDKzBxHiI": espConnectThumbnail,
   EuHxodrye6E: partitionBuilderThumbnail,
   bFq05qXqin0: videoConversionThumbnail,
@@ -35,6 +37,16 @@ const tutorialThumbnailsByVideoId: Record<string, string> = {
 };
 
 const toolItems: ToolItem[] = [
+  {
+    key: "esp-image-server",
+    title: "ESPImageServer",
+    icon: "mdi-image-multiple-outline",
+    description:
+      "ESPImageServer is a free desktop app for generating AI images and videos locally. Create images from text prompts, animate them, and play the results on supported ESP32 displays.",
+    sourceUrl: "https://github.com/thelastoutpostworkshop/ESPImageServer",
+    sourceLabel: "thelastoutpostworkshop/ESPImageServer",
+    tutorialUrl: "https://youtu.be/4_eT38NmxBw"
+  },
   {
     key: "espconnect",
     title: "ESPConnect",
@@ -123,7 +135,7 @@ function getTutorialActionUrl(tool: ToolItem): string | null {
     return tool.tutorialUrl;
   }
 
-  return getYoutubeVideoId(tool.url) ? tool.url : null;
+  return tool.url && getYoutubeVideoId(tool.url) ? tool.url : null;
 }
 
 function getYoutubeVideoId(url: string | null | undefined): string | null {
@@ -263,6 +275,7 @@ function normalizeYoutubeVideoId(value: string | null | undefined): string | nul
           </v-btn>
           <v-spacer />
           <v-btn
+            v-if="tool.url"
             color="primary"
             :prepend-icon="tool.actionIcon ?? 'mdi-open-in-new'"
             @click="openExternal(tool.url)"

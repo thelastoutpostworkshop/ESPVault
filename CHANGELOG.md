@@ -4,6 +4,11 @@ All notable changes to ESP Board Vault are documented in this file.
 
 ## 1.0.35
 
+### Added
+
+- Added ESPImageServer to Maker Tools with a preview, a GitHub repository
+  link, and a video tutorial.
+
 ### Changed
 
 - Updated Electron to 45.4.1 and refreshed npm dependencies, including Vue,

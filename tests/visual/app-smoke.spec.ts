@@ -30,6 +30,34 @@ test.describe("app smoke", () => {
     await expect(page.locator(".page-header")).toContainText("Add project");
   });
 
+  test("opens the ESPImageServer tutorial and repository from Maker Tools", async ({ page }) => {
+    await openHarness(page);
+    await openView(page, "Maker Tools");
+
+    const card = page.locator(".tool-card").filter({ hasText: "ESPImageServer" });
+    const thumbnail = card.getByAltText("ESPImageServer tutorial thumbnail");
+    await expect(thumbnail).toBeVisible();
+    await expect
+      .poll(() => thumbnail.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    await expect(card.getByRole("button", { name: "Open tool" })).toHaveCount(0);
+
+    const tutorialUrl = "https://youtu.be/4_eT38NmxBw";
+    const actions = [
+      ["Watch ESPImageServer tutorial", tutorialUrl],
+      ["Watch tutorial", tutorialUrl],
+      ["thelastoutpostworkshop/ESPImageServer", "https://github.com/thelastoutpostworkshop/ESPImageServer"]
+    ];
+    for (const [name, url] of actions) {
+      await Promise.all([
+        page.waitForEvent("console", (message) =>
+          message.type() === "info" && message.text() === `Browser harness blocked external open. ${url}`
+        ),
+        card.getByRole("button", { name, exact: true }).click()
+      ]);
+    }
+  });
+
   test("places vault activity legend below the heatmap squares", async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await openHarness(page);

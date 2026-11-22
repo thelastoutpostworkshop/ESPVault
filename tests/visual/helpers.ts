@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-type AppView = "Boards" | "Dashboard" | "Projects" | "Settings";
+type AppView = "Boards" | "Dashboard" | "Maker Tools" | "Projects" | "Settings";
 
 export async function openHarness(page: Page): Promise<void> {
   await page.goto("/browser-harness.html");
