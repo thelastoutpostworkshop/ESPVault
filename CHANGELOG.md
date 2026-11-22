@@ -2,6 +2,19 @@
 
 All notable changes to ESP Board Vault are documented in this file.
 
+## 1.0.35
+
+### Changed
+
+- Updated Electron to 45.4.1 and refreshed npm dependencies, including Vue,
+  Vuetify, and the ESP board scanning library.
+
+### Fixed
+
+- Fixed TypeScript errors in the project editor's status selector.
+- Resolved a Vite configuration warning in the development app and browser
+  harness.
+
 ## 1.0.34
 
 ### Fixed
